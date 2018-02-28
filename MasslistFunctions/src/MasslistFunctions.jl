@@ -1,7 +1,46 @@
 __precompile__()
 module MasslistFunctions
 
-export masslistPos, createMassList, loadMasslist, createCompound, massFromComposition, massFromCompositionArray, massFromCompositionArrayList, isotopesFromComposition, isotopesFromCompositionArray, sumFormulaStringFromCompositionArray, sumFormulaStringListFromCompositionArrayList, filterMassListByContribution1, filterMassListByContribution2, findClosestMassIndex, inCompositions, findInCompositions
+export IntegrationBorders, masslistPos, createMassList, loadMasslist, createCompound, massFromComposition, massFromCompositionArray, massFromCompositionArrayList, isotopesFromComposition, isotopesFromCompositionArray, sumFormulaStringFromCompositionArray, sumFormulaStringListFromCompositionArrayList, filterMassListByContribution1, filterMassListByContribution2, findClosestMassIndex, inCompositions, findInCompositions
+
+struct IntegrationBorders
+    centerMass::Array{Float64}
+    lowMass::Array{Float64}
+    highMass::Array{Float64}
+
+    function IntegrationBorders(masslist::Array{Float64,1}, resolution)
+        borders = new(similar(masslist), similar(masslist),similar(masslist))
+        if length(masslist) < 2
+            # return just one
+            borders.lowMass[1] = masslist[i]-masslist[i]/resolution
+            borders.highMass[1] = masslist[i]+masslist[i]/resolution
+            borders.centerMass[1] = masslist[i]
+            return borders
+        end
+        #set center masses
+        #1st and last don't have two neighbors
+        borders.lowMass[1] = masslist[1]-(masslist[1]/resolution)
+        borders.highMass[end] = masslist[end]+(masslist[end]/resolution)
+        borders.centerMass[1] = masslist[1]
+        borders.centerMass[end] = masslist[end]
+
+        for i=1:length(masslist)-1 # working on gaps between masses, not on masses
+            borders.centerMass[i] = masslist[i]
+            if (2*masslist[i]/resolution) < (masslist[i+1]-masslist[i]) # distance to next mass is bigger than 2*resolution --> use resolution border
+                borders.highMass[i] = masslist[i]+(masslist[i]/resolution)
+                borders.lowMass[i+1] = masslist[i+1]-(masslist[i]/resolution)
+            else # use half the distance as border
+                center = (masslist[i] + masslist[i+1])/2
+                borders.highMass[i] = center
+                borders.lowMass[i+1] = center
+            end
+        end
+        return borders
+    end
+    function IntegrationBorders(masslist::Array{Float64,1})
+        return IntegrationBorders(masslist, 3000.0)
+    end
+end
 
 massC=12
 massC13=13.00335

@@ -5,7 +5,7 @@ using PyCall
 pygui(:wx) # :tk, :gtk3, :gtk, :qt5, :qt4, :qt, or :wx
 using PyPlot
 import InterpolationFunctions
-using MasslistFunctions
+import  MasslistFunctions
 using ResultFileFunctions
 
 include("plotRunsCloud10.jl")
@@ -41,12 +41,12 @@ if reconstruct == true
   import MultipeakFunctions
   # Used for Peak Reconstruction
   println("Reconstructing Spectrum from fitted single peaks...")
-  massAxis = h5read(file, "MassAxis")
-  masslistElements = h5read(file,"ElementNames")
-  peakShapesCenterMass = h5read(file, "MassDepPeakshapeCenterMasses")
-  peakShapesY = h5read(file, "MassDepPeakshape")
+  massAxis = HDF5.h5read(file, "MassAxis")
+  masslistElements = HDF5.h5read(file,"ElementNames")
+  peakShapesCenterMass = HDF5.h5read(file, "MassDepPeakshapeCenterMasses")
+  peakShapesY = HDF5.h5read(file, "MassDepPeakshape")
   counts = mean(traces,1)
-  avgSpec = h5read(file,"AvgSpectrum") - h5read(file,"AvgBaseline")
+  avgSpec = HDF5.h5read(file,"AvgSpectrum") - HDF5.h5read(file,"AvgBaseline")
   reconstructedSpectrum = reconstructSpectrum(massAxis, masses, masslistElements, compositions, counts, peakShapesCenterMass, peakShapesY)
   figure()
   semilogy(massAxis, avgSpec, label="Original")

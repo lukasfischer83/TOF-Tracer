@@ -36,7 +36,7 @@ end
 function mass2timebin(mass::AbstractArray,mode,parameters)
   ret = Array{Float64}(length(mass))
   for i = 1:length(mass)
-    ret[i] = mass2timebin(mass[i],mode,parameters)
+    ret[i] = TOFFunctions.mass2timebin(mass[i],mode,parameters)
   end
   return ret
 end
@@ -101,14 +101,14 @@ function getAvgSpectrumFromFile(filename)
 
   H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks.*H5NbrBufs.*H5NbrWrites .* 1e-9
 
-  avgSpectrum = h5read(filename, "FullSpectra/SumSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
+  avgSpectrum = HDF5.h5read(filename, "FullSpectra/SumSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
   return avgSpectrum
 end
 
 function getSubSpectraCount(filename)
   #println("Getting sub spectrum count from $filename")
 
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   ds = fh["/FullSpectra/TofData"]
   l=size(ds)[3]
   m=size(ds)[4]
@@ -117,16 +117,16 @@ function getSubSpectraCount(filename)
 end
 
 function getSubSpectrumFromFile(filename, index)
-  #allSpectra = h5read(totalPath, "/FullSpectra/TofData")
-  #allSpectraTimes = h5read(totalPath, "/TimingData/BufTimes")
+  #allSpectra = HDF5.h5read(totalPath, "/FullSpectra/TofData")
+  #allSpectraTimes = HDF5.h5read(totalPath, "/TimingData/BufTimes")
   #k=1:size(allSpectra)[2], m=1:size(allSpectra)[4], l=1:size(allSpectra)[3]
-  #allSpectraTimes = h5read(filename, "/TimingData/BufTimes")
+  #allSpectraTimes = HDF5.h5read(filename, "/TimingData/BufTimes")
   if spectraCache.filename != filename
-      fh = h5open(filename,"r")
+      fh = HDF5.h5open(filename,"r")
       ds = fh["/FullSpectra/TofData"]
       if prod(size(ds)) < SPEC_CACHE_SIZE_LIMIT
           println("Caching spectra of $filename")
-          spectraCache.content = h5read(filename, "/FullSpectra/TofData") #ds[:,:,:,:]
+          spectraCache.content = HDF5.h5read(filename, "/FullSpectra/TofData") #ds[:,:,:,:]
           spectraCache.filename = filename
           close(fh)
       else
@@ -162,8 +162,8 @@ end
 
 function getSubSpectrumTimeFromFile(filename, index)
     if filename != timeCache.filename
-        fh = h5open(filename,"r")
-        allSpectraTimes = h5read(filename, "/TimingData/BufTimes")
+        fh = HDF5.h5open(filename,"r")
+        allSpectraTimes = HDF5.h5read(filename, "/TimingData/BufTimes")
         ds = fh["/TimingData/BufTimes"]
         timeCache.filename = filename
         timeCache.content = ds[:,:]
@@ -222,7 +222,7 @@ function validateHDF5Files(filepath, files)
           if debuglevel > 0   println("Bad File: $totalPath") end
           push!(badFiles,files[j])
         else
-          fh = h5open(totalPath,"r")
+          fh = HDF5.h5open(totalPath,"r")
           ds = fh["TimingData/BufTimes"]
           if (length(ds) > 0)
             if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
@@ -277,8 +277,8 @@ function setMassScaleReferenceSpectrum(referenceSpectrum, calibRegions, searchWi
   global m_plotControlMass = plotControlMass
 
   for region in m_calibRegions
-    referenceIndexStart::Int64 = round(mass2timebin(region -  searchWidth, referenceMassScaleMode,referenceMassScaleParameters))
-    referenceIndexEnd::Int64 = round(mass2timebin(region +  searchWidth, referenceMassScaleMode,referenceMassScaleParameters))
+    referenceIndexStart::Int64 = round(TOFFunctions.mass2timebin(region -  searchWidth, referenceMassScaleMode,referenceMassScaleParameters))
+    referenceIndexEnd::Int64 = round(TOFFunctions.mass2timebin(region +  searchWidth, referenceMassScaleMode,referenceMassScaleParameters))
     regionToMatch = m_referenceSpectrum[referenceIndexStart:referenceIndexEnd]
 
     push!(m_regionsToMatch,  regionToMatch)
@@ -291,8 +291,8 @@ function setMassScaleReferenceSpectrum(referenceSpectrum, calibRegions, searchWi
 
   end
   if m_plotControlMass
-    global crIndStart = round(mass2timebin(testRangeStart,referenceMassScaleMode,referenceMassScaleParameters))
-    global crIndEnd = round(mass2timebin(testRangeEnd,referenceMassScaleMode,referenceMassScaleParameters))
+    global crIndStart = round(TOFFunctions.mass2timebin(testRangeStart,referenceMassScaleMode,referenceMassScaleParameters))
+    global crIndEnd = round(TOFFunctions.mass2timebin(testRangeEnd,referenceMassScaleMode,referenceMassScaleParameters))
     global crMassIndicesOriginal = collect(crIndStart:1:crIndEnd)
     global crOriginalMasses = zeros(size(crMassIndicesOriginal))
     for i = 1 : length(crOriginalMasses)
@@ -318,8 +318,8 @@ for regionindex=1:length(m_calibRegions)
     region = m_calibRegions[regionindex]
 
 
-    indexStart::Int64 = round(mass2timebin(region - m_searchWidth, m_referenceMassScaleMode,m_referenceMassScaleParameters))
-    indexEnd::Int64 = round(mass2timebin(region + m_searchWidth, m_referenceMassScaleMode,m_referenceMassScaleParameters))
+    indexStart::Int64 = round(TOFFunctions.mass2timebin(region - m_searchWidth, m_referenceMassScaleMode,m_referenceMassScaleParameters))
+    indexEnd::Int64 = round(TOFFunctions.mass2timebin(region + m_searchWidth, m_referenceMassScaleMode,m_referenceMassScaleParameters))
     regionToSearch = spectrum[indexStart:indexEnd]
     correlation = (xcorr(convert(Array{Float64,1}, regionToSearch),convert(Array{Float64,1}, m_regionsToMatch[regionindex])))
     maximumCorrelation = findmax(correlation)
@@ -349,7 +349,7 @@ for regionindex=1:length(m_calibRegions)
       println("Could not correctly match m$region")
     end
     A[regionindex,1] = sqrt(region)
-    B[regionindex] = mass2timebin(region, m_referenceMassScaleMode,m_referenceMassScaleParameters)  + shift  + 0.5
+    B[regionindex] = TOFFunctions.mass2timebin(region, m_referenceMassScaleMode,m_referenceMassScaleParameters)  + shift  + 0.5
   end
 
   if success
@@ -364,8 +364,8 @@ for regionindex=1:length(m_calibRegions)
 
   if (m_plotControlMass == true)
     crNewInterpolatedValues = zeros(crOriginalMasses)
-    indexesExact = mass2timebin(crOriginalMasses, m_referenceMassScaleMode, newParams)
-    crNewInterpolatedValues = interpolate(indexesExact,spectrum)
+    indexesExact = TOFFunctions.mass2timebin(crOriginalMasses, m_referenceMassScaleMode, newParams)
+    crNewInterpolatedValues = InterpolationFunctions.interpolate(indexesExact,spectrum)
     plot(crOriginalMasses, crNewInterpolatedValues/maximum(crNewInterpolatedValues),".-")
   end
 return newParams, success, timebinshifts, intensities

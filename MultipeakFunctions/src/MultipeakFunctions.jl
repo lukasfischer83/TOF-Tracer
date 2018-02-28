@@ -1,7 +1,7 @@
 __precompile__()
 module MultipeakFunctions
-using PeakshapeFunctions
-using MasslistFunctions
+import PeakshapeFunctions
+import  MasslistFunctions
 export calculateCrossTalkMatrix, reconstructSpectrum, sumBins
 
 function calculateCrossTalkMatrix(massAxis, binWidth, masses, masslistElements, compositions, peakShapesCenterMass, peakShapesY)
@@ -15,7 +15,7 @@ function calculateCrossTalkMatrix(massAxis, binWidth, masses, masslistElements, 
     push!(centerindices, centerIndex)
     nPointsBeforePeakMax = centerIndex - searchsortedfirst(massAxis,masses[i]-1)
     if sum(compositions[:,i]) > 0
-      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = isotopesFromCompositionArray(compositions[:,i])
+      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(compositions[:,i])
     else
       println("Unidentified Peak at mass $(masses[i])")
       isotopeMasses = [masses[i]]
@@ -29,7 +29,7 @@ function calculateCrossTalkMatrix(massAxis, binWidth, masses, masslistElements, 
     for isotope = 1:length(isotopeMasses)
       isotopeCenterIndex = searchsortedfirst(massAxis, isotopeMasses[isotope])-1
       nPointsBeforeLocalPeakMax = isotopeCenterIndex - searchsortedfirst(massAxis,masses[i]-1)
-      localPeakshape = getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
+      localPeakshape = PeakshapeFunctions.getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
       localPeakshape = localPeakshape * isotopeAbundances[isotope]
       localPeakPattern[nPointsBeforeLocalPeakMax-indexOffset+1:nPointsBeforeLocalPeakMax+length(localPeakshape)-indexOffset] += localPeakshape
     end
@@ -68,7 +68,7 @@ function reconstructSpectrum(massAxis, masses, masslistElements, compositions, c
   fill(reconstructedSpectrum, 0)
   for i=1:length(masses)
     if sum(compositions[:,i]) > 0
-      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = isotopesFromCompositionArray(compositions[:,i])
+      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(compositions[:,i])
     else
       println("Unidentified Peak at mass $(masses[i])")
       isotopeMasses = [masses[i]]
@@ -79,7 +79,7 @@ function reconstructSpectrum(massAxis, masses, masslistElements, compositions, c
     for isotope = 1:length(isotopeMasses)
       centerIndex = searchsortedfirst(massAxis, isotopeMasses[isotope])
       lps = 0
-      lps = getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
+      lps = PeakshapeFunctions.getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
       reconstructedSpectrum[centerIndex-Int64((length(lps)-1)/2):centerIndex+Int64((length(lps)-1)/2)] += lps*counts[i]*isotopeAbundances[isotope]
     end
   end

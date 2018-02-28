@@ -1,7 +1,7 @@
 __precompile__()
 module ResultFileFunctions
 using HDF5
-using MasslistFunctions
+import  MasslistFunctions
 
 export MeasurementResult, joinResultsTime, joinResultsMasses, getTraces, getTimetraces, getNbrTraces, getTraceSamples, getNbrTraceSamples, findChangingMasses, saturationFromComposition, getIndicesInTimeframe
 
@@ -44,10 +44,10 @@ function loadResults(filename; useAveragesOnly = false, raw = false, startTime::
     println("Loading Times:")
     tic()
   if useAveragesOnly
-    timesUnix = h5read(filename, "AvgStickCpsTimes")
+    timesUnix = HDF5.h5read(filename, "AvgStickCpsTimes")
   else
       try
-          timesUnix = h5read(filename, "Times")
+          timesUnix = HDF5.h5read(filename, "Times")
       catch
           println("Could not load high res time, maybe this is an average-only result file?")
           return []
@@ -76,10 +76,10 @@ tic()
   println("Selecting Times and Masses:")
   tic()
 
-  masslistCompositions = h5read(filename, "ElementalCompositions")
-  masslistMasses = h5read(filename, "MassList")
-  masslistElements = h5read(filename, "ElementNames")
-  masslistElementsMasses = h5read(filename, "ElementMasses")
+  masslistCompositions = HDF5.h5read(filename, "ElementalCompositions")
+  masslistMasses = HDF5.h5read(filename, "MassList")
+  masslistElements = HDF5.h5read(filename, "ElementNames")
+  masslistElementsMasses = HDF5.h5read(filename, "ElementMasses")
 
   if length(massesToLoad) > 0
       selectionMassesIndices = Array{Int}(0)
@@ -128,12 +128,12 @@ end
 
 
 function getIndicesInTimeframe(filename, startTime::DateTime, endTime::DateTime)
-  times = h5read(filename, "Times")
+  times = HDF5.h5read(filename, "Times")
   return (1:length(times))[(times.>startTime) & (times.<endTime)]
 end
 
 function getTraces(filename; timeIndexStart=1, timeIndexEnd=0, massIndices=nothing, raw=false,  useAveragesOnly = false)
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   if useAveragesOnly
     if raw
       ds = fh["AvgStickCps"]
@@ -186,7 +186,7 @@ end
 
 
 function getTimetraces(filename, indices; raw=false)
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   if raw
     ds = fh["StickCps"]
   else
@@ -219,7 +219,7 @@ function getTimetraces(filename, indices; raw=false)
 end
 
 function getTraceSamples(filename, indices; raw=false)
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   if raw
     ds = fh["StickCps"]
   else
@@ -254,7 +254,7 @@ function getTraceSamples(filename, indices; raw=false)
 end
 
 function getNbrTraces(filename)
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   ds = fh["StickCps"]
   nbr = size(ds)[2]
   close(fh)
@@ -262,7 +262,7 @@ function getNbrTraces(filename)
 end
 
 function getNbrTraceSamples(filename)
-  fh = h5open(filename,"r")
+  fh = HDF5.h5open(filename,"r")
   ds = fh["StickCps"]
   nbr = size(ds)[1]
   close(fh)

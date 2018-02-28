@@ -1,6 +1,6 @@
 __precompile__()
 module PlotFunctions
-using MasslistFunctions
+import  MasslistFunctions
 using PyPlot
 
 export massDefectPlot
@@ -8,8 +8,8 @@ export massDefectPlot
 function massDefectPlot(masses, compositions, concentrations, colors, plotTitle, colorCodeTitle; dotSize = 10, maxMass = 450, maxDefect = 0.25, minConc = 0.02, sumformulas = false)
   figure()
 
-  h2o = createCompound(H=2,O=1, Hplus=0)
-  o = createCompound(O=1, Hplus=0)
+  h2o = MasslistFunctions.createCompound(H=2,O=1, Hplus=0)
+  o = MasslistFunctions.createCompound(O=1, Hplus=0)
 
   for i=1:length(masses)
     m = masses[i]

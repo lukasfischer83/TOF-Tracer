@@ -70,8 +70,8 @@ function loadDEWPOINT(directoryPath; filefilterRegexp = r"\.data$")
     if (isfile(outpath))
       mv(outpath, directoryPath * "/dew-bak.hdf5", remove_destination=true)
     end
-    h5write(outpath, "times", times)
-    h5write(outpath, "dewpoints", DEW)
+    HDF5.h5write(outpath, "times", times)
+    HDF5.h5write(outpath, "dewpoints", DEW)
 
     times = Dates.unix2datetime.(times)
     return times, DEW
@@ -80,7 +80,7 @@ end
 function loadDEWPOINT_cached(directoryPath)
     outpath=directoryPath * "/dew.hdf5"
 
-    t = h5read(outpath, "times")
-    d = h5read(outpath, "dewpoints")
+    t = HDF5.h5read(outpath, "times")
+    d = HDF5.h5read(outpath, "dewpoints")
     return Dates.unix2datetime.(t), d
 end

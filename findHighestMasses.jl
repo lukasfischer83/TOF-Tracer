@@ -1,7 +1,7 @@
 push!(LOAD_PATH, pwd())
 using HDF5
 using ExportFunctions
-using MasslistFunctions
+import  MasslistFunctions
 using ResultFileFunctions
 
 using PyPlot
@@ -25,16 +25,16 @@ sortResultsByMass = false
 signifficanceInSigma = 5
 
 if (plotHighTimeRes == false)
-masses = h5read(file, "MassList")
-traces = h5read(file, "CorrAvgStickCps")
-timesUnix = h5read(file, "AvgStickCpsTimes")
+masses = HDF5.h5read(file, "MassList")
+traces = HDF5.h5read(file, "CorrAvgStickCps")
+timesUnix = HDF5.h5read(file, "AvgStickCpsTimes")
 else
-  masses = h5read(file, "MassList")
-  traces = h5read(file, "CorrStickCps")
-  timesUnix = h5read(file, "Times")
+  masses = HDF5.h5read(file, "MassList")
+  traces = HDF5.h5read(file, "CorrStickCps")
+  timesUnix = HDF5.h5read(file, "Times")
 end
-compositions = h5read(file, "ElementalCompositions")
-elementNames = h5read(file, "ElementNames")
+compositions = HDF5.h5read(file, "ElementalCompositions")
+elementNames = HDF5.h5read(file, "ElementNames")
 
 times = Array(DateTime, length(timesUnix))
 

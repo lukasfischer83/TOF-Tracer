@@ -23,20 +23,24 @@ function interpolate(x::AbstractFloat, xAxis, yAxis)
 end
 
 function interpolate(x::AbstractFloat, yAxis)
-  if x <= 1
-    return yAxis[1]
-  elseif x >= length(yAxis)
-    return yAxis[end]
+    try
+      if x <= 1
+        return yAxis[1]
+      elseif x >= length(yAxis)
+        return yAxis[end]
+      end
+      indexLow = Int64(floor(x))
+      fraction = (x - indexLow)
+      return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
+  catch
+      println("Interpolation Error: x=$x, floor(x)= $(floor(x))")
   end
-  indexLow = Int64(floor(x))
-  fraction = (x - indexLow)
-  return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
 end
 
 function interpolate(x::AbstractArray, xAxis, yAxis)
   y = SharedArray{Float64}(length(x))
   @sync @parallel for i = 1 : length(x)
-    y[i] = interpolate(x[i],xAxis,yAxis)
+    y[i] = InterpolationFunctions.interpolate(x[i],xAxis,yAxis)
   end
   return convert(Array,y)
 end
@@ -44,7 +48,7 @@ end
 function interpolate(x::AbstractArray, yAxis)
   y = SharedArray{Float64}(length(x))
   @sync @parallel for i = 1 : length(x)
-    y[i] = interpolate(x[i],yAxis)
+    y[i] = InterpolationFunctions.interpolate(x[i],yAxis)
   end
   return convert(Array,y)
 end

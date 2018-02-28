@@ -1,7 +1,7 @@
 __precompile__()
 module PeakshapeFunctions
-using InterpolationFunctions
-using PyPlot
+import InterpolationFunctions
+import PyPlot
 
 export findPeakIndices, calculatePeakshapes, getLocalPeakshape
 "searches an average spectrum for peaks signifficantly higher than the baseline noise and returns their interpolated indices in the average spectrum"
@@ -9,10 +9,10 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
     totalMax = maximum(avgSpectrum)
     peakIndices = Array{Float64}(1)
     for j=searchsortedfirst(massAxis,10):length(massAxis)-1
-      if ( avgSpectrum[j] > baseline[j] + baselineNoise[j] * noiseThreshold * 400/(massAxis[j]^1.3)) && (avgSpectrum[j] > avgSpectrum[j-1]) && (avgSpectrum[j] > avgSpectrum[j+1]) && (avgSpectrum[j] < totalMax*0.1)
+      if ( avgSpectrum[j] > baseline[j] + baselineNoise[j] * noiseThreshold * 400/(massAxis[j]^0.6)) && (avgSpectrum[j] > avgSpectrum[j-1]) && (avgSpectrum[j] > avgSpectrum[j+1]) && (avgSpectrum[j] < totalMax*0.1)
           if (oddEven == "both") | ((oddEven == "even") & iseven(Int(round(massAxis[j],0)))) | ((oddEven == "odd") & !iseven(Int(round(massAxis[j],0))))
               ############ put interpolated exact peak position in peak list ###
-              push!(peakIndices,interpolatedMax(j,avgSpectrum))
+              push!(peakIndices,InterpolationFunctions.interpolatedMax(j,avgSpectrum))
           end
       end
     end
@@ -20,16 +20,15 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
   end
 
   function calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices; nbrMassRegions = 10, peakWindowWidth = 200, quantileValue = 0.05)
-    peakMasses = interpolate(peakIndices, massAxis)
-    peakValues = interpolate(peakIndices,baselineCorrectedAvgSpec)
+    peakMasses = InterpolationFunctions.interpolate(peakIndices, massAxis)
+    peakValues = InterpolationFunctions.interpolate(peakIndices,baselineCorrectedAvgSpec)
 
     peakShapesY = Array{Float64}(2*peakWindowWidth+1, nbrMassRegions)
     peakShapesCenterMass = Array(Float64,nbrMassRegions)
 
-    figure()
-
+    PyPlot.figure()
     for massRegion = 1:nbrMassRegions
-      ax=subplot(ceil(nbrMassRegions/4),4,massRegion)
+      ax=PyPlot.subplot(ceil(nbrMassRegions/4),4,massRegion)
 
       #peakshapeRangeStart = (massRegion-1) *peakMasses[end] / nbrMassRegions
       #peakshapeRangeEnd = (massRegion) *peakMasses[end] / nbrMassRegions
@@ -79,11 +78,12 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
       peakshapeY[peakWindowWidth+1] = 1
       peakShapesY[:,massRegion] = peakshapeY / sum(peakshapeY)
       if (size(peakWood,2) > 0)
-          semilogy(peakWood)
+          PyPlot.semilogy(peakWood)
       end
-      semilogy(peakshapeY, "o-", label="$peakshapeRangeStart - $peakshapeRangeEnd")
-      ax["set_title"]("$peakshapeRangeStart - $peakshapeRangeEnd")
+      PyPlot.semilogy(peakshapeY, "o-", label="$peakshapeRangeStart - $peakshapeRangeEnd")
+      ax["set_title"]("$(round(peakshapeRangeStart,1)) - $(round(peakshapeRangeEnd,1))")
     end
+    PyPlot.suptitle("Mass dependent Peakshapes")
     return peakShapesCenterMass, peakShapesY
   end
 

@@ -1,7 +1,7 @@
 __precompile__()
 module ExportFunctions
 using InterpolationFunctions
-using MasslistFunctions
+import  MasslistFunctions
 
 export exportTracesCSV
 

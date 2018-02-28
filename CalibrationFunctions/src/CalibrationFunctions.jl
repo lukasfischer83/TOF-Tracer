@@ -20,7 +20,7 @@ function generateBgTraces(times, traces; slices=10, quant=0.05)
     bgtraces = Array{Float64}(size(traces,1), size(traces,2))
     bgtimes = [mean(times[Int(floor((n-1)*l/m+1)):Int(floor(n*l/m)),1]) for n = 1:m]
     for i=1:w
-        bgtraces[:,i] = interpolate(times, bgtimes, [getMeanOfQuantile(traces[Int(floor((n-1)*l/m+1)):Int(floor(n*l/m)),i],0.08) for n = 1:m])
+        bgtraces[:,i] = InterpolationFunctions.interpolate(times, bgtimes, [getMeanOfQuantile(traces[Int(floor((n-1)*l/m+1)):Int(floor(n*l/m)),i],0.08) for n = 1:m])
     end
     if dt
         bgtimes = Dates.unix2datetime.(bgtimes)
@@ -40,7 +40,7 @@ function interpolateBgTraces(times, bgtimes, bgvalues)
     bgtraces = Array{Float64}(size(times,1), nMasses)
 
     for i=1:nMasses
-        bgtraces[:,i] = interpolate(times, bgtimes, bgvalues[:,i])
+        bgtraces[:,i] = InterpolationFunctions.interpolate(times, bgtimes, bgvalues[:,i])
     end
 
     return bgtraces
@@ -126,6 +126,6 @@ function generateCalibFactorTrace(traceTimes, calibTimes, calibValues, transitio
   PyPlot.figure()
   PyPlot.plot(piecewiseTimes, piecewiseValues, "x-")
 
-  return interpolate(traceTimes, piecewiseTimes, piecewiseValues)
+  return InterpolationFunctions.interpolate(traceTimes, piecewiseTimes, piecewiseValues)
 end
 end

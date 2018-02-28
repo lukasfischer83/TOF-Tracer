@@ -1,72 +1,74 @@
 push!(LOAD_PATH, pwd())
 
-using PyPlot
-using HDF5
-using InterpolationFunctions
-using BaselineFunctions
-using PeakshapeFunctions
+import PyPlot
+import HDF5
+import InterpolationFunctions
+import BaselineFunctions
+import PeakshapeFunctions
 
 function baselineAndPeakshape(
   filepath;
   outputfilename="results/_result.hdf5",
-  peakshapeRegions=10,
-  peakshapeQuantileValue = 0.05
+  peakshapeRegions=8,
+  peakshapeQuantileValue = 0.1,
+  peakfindingNoiseThresholdValue = 25
   )
 
   file = joinpath(filepath, outputfilename)
-  massAxis = h5read(file, "MassAxis")
-  avgSpectrum = h5read(file, "AvgSpectrum")
+  massAxis = HDF5.h5read(file, "MassAxis")
+  avgSpectrum = HDF5.h5read(file, "AvgSpectrum")
 
-  baselinePoints, baselineValues, baselineNoise = calculateBaseline(massAxis,avgSpectrum,baselinePointWidth = 0.8, threshold=0.2)
-  baselineNoiseInterpolated = interpolate(massAxis, baselinePoints, baselineNoise)
-  baselineInterpolated = interpolate(massAxis, baselinePoints, baselineValues)
+  baselinePoints, baselineValues, baselineNoise = BaselineFunctions.calculateBaseline(massAxis,avgSpectrum,baselinePointWidth = 0.8, threshold=0.2)
+  baselineNoiseInterpolated = InterpolationFunctions.interpolate(massAxis, baselinePoints, baselineNoise)
+  baselineInterpolated = InterpolationFunctions.interpolate(massAxis, baselinePoints, baselineValues)
   baselineCorrectedAvgSpec = avgSpectrum[:,1] - baselineInterpolated;
 
 
-  peakIndices = findPeakIndices(massAxis, avgSpectrum, baselineInterpolated, baselineNoiseInterpolated)
-  peakShapesCenterMass, peakShapesY = calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices, nbrMassRegions = peakshapeRegions, quantileValue = peakshapeQuantileValue)
+  peakIndices = PeakshapeFunctions.findPeakIndices(massAxis, avgSpectrum, baselineInterpolated, baselineNoiseInterpolated, noiseThreshold = peakfindingNoiseThresholdValue)
+  peakShapesCenterMass, peakShapesY = PeakshapeFunctions.calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices, nbrMassRegions = peakshapeRegions, quantileValue = peakshapeQuantileValue)
 
-  figure()
-  semilogy(baselinePoints,baselineValues,".-")
-  semilogy(baselinePoints,baselineValues + baselineNoise,".")
+  PyPlot.figure()
+  PyPlot.title("Baseline Correction")
+  PyPlot.semilogy(baselinePoints,baselineValues,".-")
+   PyPlot.semilogy(baselinePoints,baselineValues + baselineNoise,".")
   #semilogy(peakMasses, peakValues, "x")
-  semilogy(massAxis,avgSpectrum)
+   PyPlot.semilogy(massAxis,avgSpectrum)
 
 
   ############ delete h5 data that will be overwritten ###########
-  fh = h5open(file,"r+")
-  if exists(fh, "AvgBaseline")
-    o_delete(fh,"AvgBaseline")
+  fh = HDF5.h5open(file,"r+")
+  if HDF5.exists(fh, "AvgBaseline")
+    HDF5.o_delete(fh,"AvgBaseline")
   end
-  if exists(fh, "MassDepPeakshape")
-  o_delete(fh,"MassDepPeakshape")
+  if HDF5.exists(fh, "MassDepPeakshape")
+  HDF5.o_delete(fh,"MassDepPeakshape")
   end
-  if exists(fh, "MassDepPeakshapeCenterMasses")
-  o_delete(fh,"MassDepPeakshapeCenterMasses")
+  if HDF5.exists(fh, "MassDepPeakshapeCenterMasses")
+  HDF5.o_delete(fh,"MassDepPeakshapeCenterMasses")
   end
-  if exists(fh, "BaseLines")
-  o_delete(fh,"BaseLines")
+  if HDF5.exists(fh, "BaseLines")
+  HDF5.o_delete(fh,"BaseLines")
   end
-  close(fh)
+  HDF5.close(fh)
 
 
-  h5write(file, "AvgBaseline", baselineInterpolated)
-  h5write(file, "MassDepPeakshape", peakShapesY)
-  h5write(file, "MassDepPeakshapeCenterMasses", peakShapesCenterMass)
+  HDF5.h5write(file, "AvgBaseline", baselineInterpolated)
+  HDF5.h5write(file, "MassDepPeakshape", peakShapesY)
+  HDF5.h5write(file, "MassDepPeakshapeCenterMasses", peakShapesCenterMass)
 
-  fh = h5open(file,"r")
+  fh = HDF5.h5open(file,"r")
   ds = fh["SumSpecs"]
   spectra = size(ds)[2]
-  close(fh)
+  HDF5.close(fh)
   if (spectra > 0)
-    SumSpecs = h5read(file, "SumSpecs")
+    SumSpecs = HDF5.h5read(file, "SumSpecs")
     fill!(SumSpecs,0)
-    h5write(file, "BaseLines", SumSpecs)
+    HDF5.h5write(file, "BaseLines", SumSpecs)
 
   else
-    h5write(file, "SumSpecs", avgSpectrum)
+    HDF5.h5write(file, "SumSpecs", avgSpectrum)
     fill!(avgSpectrum,0)
-    h5write(file, "BaseLines", avgSpectrum)
+    HDF5.h5write(file, "BaseLines", avgSpectrum)
   end
 
   println("DONE")
