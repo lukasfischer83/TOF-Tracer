@@ -3,6 +3,7 @@ import PyPlot
 import MultipeakFunctions
 import MasslistFunctions
 import ResultFileFunctions
+import InterpolationFunctions
 
 #include("masslistFunctions.jl")
 
@@ -23,6 +24,13 @@ function deconvolute(
   masslistElements = HDF5.h5read(file,"ElementNames")
   compositionsOrig = HDF5.h5read(file, "ElementalCompositions")
   massesOrig = HDF5.h5read(file, "MassList")
+  massBordersLowOrig = HDF5.h5read(file, "MassListIntegrationBordersLow")
+  massBordersHighOrig = HDF5.h5read(file, "MassListIntegrationBordersHigh")
+  massCenterIdxOrig = HDF5.h5read(file, "MassListIdx")
+  massLowIdxOrig = HDF5.h5read(file, "MassListIntegrationBordersIdxLow")
+  massHighIdxOrig = HDF5.h5read(file, "MassListIntegrationBordersIdxHigh")
+  massScaleMode = HDF5.h5read(file, "MassCalibMode")
+  massScaleParameters = HDF5.h5read(file, "MassCalibParameters")
   if unique(massesOrig) != massesOrig
     println("Multiple entries of the same mass --> will produce singular matrix!!!")
   end
@@ -32,6 +40,12 @@ function deconvolute(
 
     selector = (massesOrig .> 0)
     masses = massesOrig[selector]
+    massBordersLow = massBordersLowOrig[selector]
+    massBordersHigh = massBordersHighOrig[selector]
+    massCenterIdx = massCenterIdxOrig[selector]
+    massLowIdx = massLowIdxOrig[selector]
+    massHighIdx = massHighIdxOrig[selector]
+
     compositions = compositionsOrig[:,selector]
 
 
@@ -39,8 +53,9 @@ function deconvolute(
 
     print("Populating matrix for inversion of linear system...")
     tic()
-    mtrx = MultipeakFunctions.calculateCrossTalkMatrix(massAxis, binWidth, masses, masslistElements, compositions, peakShapesCenterMass, peakShapesY)
-    stickRaw = MultipeakFunctions.sumBins(massAxis,binWidth,totalAvgSpectrum,masses)
+
+    mtrx = MultipeakFunctions.calculateCrossTalkMatrix(masses, massCenterIdx, massLowIdx, massHighIdx, massScaleMode, massScaleParameters, compositions, peakShapesCenterMass, peakShapesY)
+    stickRaw = [InterpolationFunctions.interpolatedSum(massLowIdx[i], massHighIdx[i], totalAvgSpectrum) for i=1:length(masses)]
     toc()
     println(" DONE")
 
@@ -64,10 +79,14 @@ function deconvolute(
 
   PyPlot.semilogy(massAxis,totalAvgSpectrum, "-o", label="Original", color="r")
   #reconstructedSpectrum = reconstructSpectrum(massAxis, masses[(masses.>158) & (masses.<162)], masslistElements, compositions[:,(masses.>158) & (masses.<162)], counts[(masses.>158) & (masses.<162)], peakShapesCenterMass, peakShapesY)
-  reconstructedSpectrum = MultipeakFunctions.reconstructSpectrum(massAxis, masses, MasslistFunctions.masslistElements, compositions, counts, peakShapesCenterMass, peakShapesY)
+  reconstructedSpectrum = MultipeakFunctions.reconstructSpectrum(massAxis, massScaleMode, massScaleParameters, masses, compositions, counts, peakShapesCenterMass, peakShapesY)
 
   PyPlot.plot(massAxis, reconstructedSpectrum, label="Fit", color="b")
   PyPlot.plot(massAxis, totalAvgSpectrum-reconstructedSpectrum, label="Residual", color="g")
+  assyErrorX = [(masses-massBordersLow)'; (massBordersHigh-masses)']
+  y = InterpolationFunctions.interpolate(masses, massAxis, totalAvgSpectrum)
+  PyPlot.errorbar(TOFFunctions.timebin2mass(massCenterIdx, massScaleMode, massScaleParameters),y,xerr=assyErrorX, fmt="o")
+  PyPlot.errorbar(masses,y,xerr=assyErrorX, fmt="x")
   #=
   fittedPeaks = Array{Float64}(length(masses),2001)
   for i=1:length(masses)
@@ -154,4 +173,5 @@ function deconvolute(
   #else
   #  traces = HDF5.h5read(file, "CorrAvgStickCps")[:,selector]
   #end
+  return sparseMtrx
 end

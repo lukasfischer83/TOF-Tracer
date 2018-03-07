@@ -12,9 +12,9 @@ struct IntegrationBorders
         borders = new(similar(masslist), similar(masslist),similar(masslist))
         if length(masslist) < 2
             # return just one
-            borders.lowMass[1] = masslist[i]-masslist[i]/resolution
-            borders.highMass[1] = masslist[i]+masslist[i]/resolution
-            borders.centerMass[1] = masslist[i]
+            borders.lowMass[1] = masslist[1]-masslist[1]/resolution
+            borders.highMass[1] = masslist[1]+masslist[1]/resolution
+            borders.centerMass[1] = masslist[1]
             return borders
         end
         #set center masses

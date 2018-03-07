@@ -1,6 +1,6 @@
 __precompile__()
 module InterpolationFunctions
-export interpolatedMax, interpolate, interpolatedSum, medianfilter, averageSamples, smooth
+export interpolatedMax, interpolate, interpolatedSum, addArraysShiftedInterpolated, medianfilter, averageSamples, smooth
 
 function interpolatedMax(discreteMax, values)
   inta=values[discreteMax-1]
@@ -83,6 +83,29 @@ function interpolatedSum(startIndexExact::AbstractFloat, endIndexExact::Abstract
     ret = sum(yAxis[subIdxStart:subIdxEnd]) + yAxis[subIdxStart-1]*subIdxStartRoundError + yAxis[subIdxEnd+1]*subIdxEndRoundError
   end
   return ret
+end
+
+function addArraysShiftedInterpolated(destinationArray::Array, sourceArray::Array, indexShift::Number)
+    if ceil(indexShift) == indexShift
+        lowContrib = 1
+    else
+        lowContrib = ceil(indexShift) - indexShift
+    end
+    highContrib = 1-lowContrib
+    minIdx = Int64(floor(indexShift)+1)
+    maxIdx = Int64(minIdx + length(sourceArray)-1)
+    if minIdx > length(destinationArray)
+        return destinationArray
+    end
+    if maxIdx > length(destinationArray)
+        maxIdx = length(destinationArray)
+    end
+    destinationArray[minIdx:maxIdx] += lowContrib*sourceArray[1:maxIdx-minIdx+1]
+    if maxIdx > length(destinationArray)-1
+        maxIdx = length(destinationArray)-1
+    end
+    destinationArray[minIdx+1:maxIdx+1] += highContrib*sourceArray[1:maxIdx-minIdx+1]
+    return destinationArray
 end
 
 function medianfilter(v,ws)

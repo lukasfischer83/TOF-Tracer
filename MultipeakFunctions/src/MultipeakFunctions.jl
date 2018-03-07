@@ -1,55 +1,58 @@
 __precompile__()
 module MultipeakFunctions
 import PeakshapeFunctions
-import  MasslistFunctions
+import MasslistFunctions
+import TOFFunctions
+import InterpolationFunctions
+
 export calculateCrossTalkMatrix, reconstructSpectrum, sumBins
 
-function calculateCrossTalkMatrix(massAxis, binWidth, masses, masslistElements, compositions, peakShapesCenterMass, peakShapesY)
-  mtrx = Array(Float64,length(masses), length(masses))
-  fill(mtrx,0)
-  centerindices = Array(Float64,0)
-  for i = 1:length(masses)
+
+function createPeakPattern(mass, composition, massScaleMode, massScaleParameters, peakShapesCenterMass, peakShapesY)
+    safetyMarginMasses = 10
     peakShapeSize = size(peakShapesY,1)
-    indexOffset::Int64 = round(peakShapeSize+1)/2
-    centerIndex = searchsortedfirst(massAxis, masses[i])#-1
-    push!(centerindices, centerIndex)
-    nPointsBeforePeakMax = centerIndex - searchsortedfirst(massAxis,masses[i]-1)
-    if sum(compositions[:,i]) > 0
-      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(compositions[:,i])
+    # Get isotopes
+    if sum(composition) > 0
+      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(composition)
     else
-      println("Unidentified Peak at mass $(masses[i])")
-      isotopeMasses = [masses[i]]
-      isotopeMasslistElements = [masslistElements]
-      isotopeCompositions = [compositions[:,i]]
+      println("Unidentified Peak at mass $(mass)")
+      isotopeMasses = [mass]
       isotopeAbundances = [1]
     end
-
-    nLocalPeakPatternPoints = searchsortedfirst(massAxis, masses[i]+3.5)+ - searchsortedfirst(massAxis, masses[i]-1)
+    isotopeMassesIdx = TOFFunctions.mass2timebin(isotopeMasses, massScaleMode, massScaleParameters)
+    # Create Peak Pattern
+    # how many points minimum are needed?
+    nLocalPeakPatternPoints = ceil(TOFFunctions.mass2timebin(maximum(isotopeMasses) + safetyMarginMasses, massScaleMode, massScaleParameters) - TOFFunctions.mass2timebin(minimum(isotopeMasses) - safetyMarginMasses, massScaleMode, massScaleParameters))
     localPeakPattern = zeros(nLocalPeakPatternPoints)
+
+    # where will be zero index? isotope could have lower mass!
+    startIndex = TOFFunctions.mass2timebin(minimum(isotopeMasses) - safetyMarginMasses, massScaleMode, massScaleParameters)
     for isotope = 1:length(isotopeMasses)
-      isotopeCenterIndex = searchsortedfirst(massAxis, isotopeMasses[isotope])-1
-      nPointsBeforeLocalPeakMax = isotopeCenterIndex - searchsortedfirst(massAxis,masses[i]-1)
       localPeakshape = PeakshapeFunctions.getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
       localPeakshape = localPeakshape * isotopeAbundances[isotope]
-      localPeakPattern[nPointsBeforeLocalPeakMax-indexOffset+1:nPointsBeforeLocalPeakMax+length(localPeakshape)-indexOffset] += localPeakshape
+      indexRelativeToStartIdx = isotopeMassesIdx[isotope] - startIndex
+      indexRelativeToPeakshapeStart = indexRelativeToStartIdx - (peakShapeSize-1)/2
+      InterpolationFunctions.addArraysShiftedInterpolated(localPeakPattern, localPeakshape, indexRelativeToPeakshapeStart-1)
     end
-    for j = 1:length(masses)
-        if ((masses[j] > masses[i]-1) && (masses[j] < masses[i]+3.5))
-        dist = searchsortedfirst(massAxis,masses[j]) - centerIndex
-        relativeStartIdx = (nPointsBeforePeakMax + dist - binWidth)
-        relativeEndIdx = (nPointsBeforePeakMax + dist + binWidth)
-        if (relativeStartIdx > 0) && (relativeEndIdx < length(localPeakPattern))
-          overlap = sum(localPeakPattern[relativeStartIdx : relativeEndIdx])
-          mtrx[j,i] = overlap
-        else
-            mtrx[j,i] = 0
+    return startIndex, localPeakPattern
+end
+
+
+function calculateCrossTalkMatrix(masses, centerindices, lowindices, highindices, massScaleMode, massScaleParameters, compositions, peakShapesCenterMass, peakShapesY)
+    mtrx = Array(Float64,length(masses), length(masses))
+    fill(mtrx,0)
+    for i = 1:length(masses)
+        startIndex, localPeakPattern = createPeakPattern(masses[i], compositions[:,i], massScaleMode, massScaleParameters, peakShapesCenterMass, peakShapesY)
+        for j = 1:length(masses)
+            if ((masses[j] > masses[i]-1) && (masses[j] < masses[i]+3.5))
+                overlap = InterpolationFunctions.interpolatedSum(lowindices[j]-startIndex-1, highindices[j]-startIndex-1, localPeakPattern)
+                mtrx[j,i] = overlap
+            else
+                mtrx[j,i] = 0
+            end
         end
-      else
-          mtrx[j,i] = 0
     end
-    end
-  end
-  return mtrx
+    return mtrx
 end
 
 function sumBins(massAxis, binWidth, spectrum, masses)
@@ -62,26 +65,13 @@ function sumBins(massAxis, binWidth, spectrum, masses)
   return stickRaw
 end
 
-function reconstructSpectrum(massAxis, masses, masslistElements, compositions, counts, peakShapesCenterMass, peakShapesY)
+function reconstructSpectrum(massAxis, massScaleMode, massScaleParameters, masses, compositions, counts, peakShapesCenterMass, peakShapesY)
 
   reconstructedSpectrum = zeros(length(massAxis))
   fill(reconstructedSpectrum, 0)
   for i=1:length(masses)
-    if sum(compositions[:,i]) > 0
-      isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(compositions[:,i])
-    else
-      println("Unidentified Peak at mass $(masses[i])")
-      isotopeMasses = [masses[i]]
-      isotopeMasslistElements = [masslistElements]
-      isotopeCompositions = [compositions[:,i]]
-      isotopeAbundances = [1]
-    end
-    for isotope = 1:length(isotopeMasses)
-      centerIndex = searchsortedfirst(massAxis, isotopeMasses[isotope])
-      lps = 0
-      lps = PeakshapeFunctions.getLocalPeakshape(isotopeMasses[isotope], peakShapesCenterMass, peakShapesY)
-      reconstructedSpectrum[centerIndex-Int64((length(lps)-1)/2):centerIndex+Int64((length(lps)-1)/2)] += lps*counts[i]*isotopeAbundances[isotope]
-    end
+      startIndex, localPeakPattern = createPeakPattern(masses[i], compositions[:,i], massScaleMode, massScaleParameters, peakShapesCenterMass, peakShapesY)
+      InterpolationFunctions.addArraysShiftedInterpolated(reconstructedSpectrum, counts[i]*localPeakPattern, startIndex)
   end
   return reconstructedSpectrum
 end

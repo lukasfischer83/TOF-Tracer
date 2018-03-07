@@ -71,7 +71,7 @@ function correctMassScaleAndExtractSumSpec(
   if (referenceFile == "")
     referenceFile = joinpath(filepath, files[1])
     if (debuglevel > 1)
-      println("Reference File Autodetected: $referenceFile")
+      println("Reference File Autodetected (using first file in folder): $referenceFile")
     end
   end
 
@@ -82,6 +82,12 @@ function correctMassScaleAndExtractSumSpec(
   referenceMassAxis = []
   referenceMassAxis = HDF5.h5read(referenceFile, "FullSpectra/MassAxis")
 
+  # Tofwerk does not update the mass axis after manual recalibration in TofDAQ Viewer.
+  # ==> recalculate based on calib parameters.
+  println("Recalculating mass axis")
+  for i=1:length(referenceMassAxis)
+      referenceMassAxis[i] = TOFFunctions.timebin2mass(i, referenceMassScaleMode, referenceMassScaleParameters)
+  end
   totalAvgSpectrum = SharedArray{Float64}(length(referenceSpectrum))
   totalAvgSubSpectrum = SharedArray{Float64}(length(referenceSpectrum))
   totalMinSpectrum = SharedArray{Float64}(length(referenceSpectrum))
@@ -104,13 +110,15 @@ function correctMassScaleAndExtractSumSpec(
 
   time = SharedArray{DateTime}(nFiles)
   stickcps=SharedArray{Float64}(nMasses,nFiles)
+
   # Calculate Integration Borders
   if (massBorderCalculation == 0)
   mlow = masslistMasses - 0.1
   mhigh = masslistMasses + 0.4
   elseif  (massBorderCalculation == 1)
-  mlow = masslistMasses .* resolution./(resolution+0.5)
-  mhigh = masslistMasses .* resolution./(resolution-0.5)
+  #mlow = masslistMasses .* resolution./(resolution+0.5)
+  #mhigh = masslistMasses .* resolution./(resolution-0.5)
+  massborders = MasslistFunctions.IntegrationBorders(masslistMasses, resolution)
   end
 
 
@@ -174,7 +182,6 @@ function correctMassScaleAndExtractSumSpec(
 
     #if debuglevel > 0   println("Processing File $totalPath") end
     if (createTotalAvg == true && !fileIsBad)
-      #println("153: rma: $(length(referenceMassAxis)), rmsm: $referenceMassScaleMode, p: $newParams")
       indexesExact = TOFFunctions.mass2timebin(referenceMassAxis, referenceMassScaleMode, newParams)
       interpolatedSpectrum = InterpolationFunctions.interpolate(indexesExact,avgSpectrum)
       totalAvgSpectrum += interpolatedSpectrum
@@ -207,11 +214,9 @@ function correctMassScaleAndExtractSumSpec(
           raw = 0
         end
       else
-        subIdxStartExact=TOFFunctions.mass2timebin(mlow[i],referenceMassScaleMode,newParams)
-        subIdxEndExact = TOFFunctions.mass2timebin(mhigh[i],referenceMassScaleMode,newParams)
-        print("summing $subIdxStartExact to $subIdxEndExact: ")
-        raw = interpolatedSum(subIdxStartExact,subIdxEndExact,avgSpectrum)
-        println(raw)
+        subIdxStartExact=TOFFunctions.mass2timebin(massborders.lowMass[i],referenceMassScaleMode,newParams)
+        subIdxEndExact = TOFFunctions.mass2timebin(massborders.highMass[i],referenceMassScaleMode,newParams)
+        raw = InterpolationFunctions.interpolatedSum(subIdxStartExact,subIdxEndExact,avgSpectrum)
       end
       stickcps[i,j] = raw
     end
@@ -278,15 +283,9 @@ function correctMassScaleAndExtractSumSpec(
             subSpecStickCps[i]=raw
           else
             #if debuglevel > 0   println("Processing region mass($(mlow[i]):$(mhigh[i])) --> timebin($(round(TOFFunctions.mass2timebin(mlow[i],massCalibMode,newParams))):$(round(TOFFunctions.mass2timebin(mhigh[i],massCalibMode,newParams))))") end
-            subIdxStartExact=TOFFunctions.mass2timebin(mlow[i],referenceMassScaleMode,newParams)
-            subIdxStart::Int64 = ceil(subIdxStartExact)
-            subIdxStartRoundError = subIdxStart - subIdxStartExact
-
-            subIdxEndExact = TOFFunctions.mass2timebin(mhigh[i],referenceMassScaleMode,newParams)
-            subIdxEnd::Int64 = floor(subIdxEndExact)
-            subIdxEndRoundError = subIdxEndExact - subIdxEnd
-            raw = sum(view(subSpectrum, subIdxStart:subIdxEnd)) + subSpectrum[subIdxStart-1]*subIdxStartRoundError + subSpectrum[subIdxEnd+1]*subIdxEndRoundError
-            subSpecStickCps[i]=raw
+            subIdxStartExact=TOFFunctions.mass2timebin(massborders.lowMass[i],referenceMassScaleMode,newParams)
+            subIdxEndExact = TOFFunctions.mass2timebin(massborders.lowMass[i],referenceMassScaleMode,newParams)
+            subSpecStickCps[i]= InterpolationFunctions.interpolatedSum(subIdxStartExact,subIdxEndExact,subSpectrum)
           end
         end
         rawTime = TOFFunctions.getSubSpectrumTimeFromFile(totalPath,subSpecIdx)
@@ -346,6 +345,15 @@ function correctMassScaleAndExtractSumSpec(
   HDF5.h5write(outfilepath, "AvgStickCpsErr", stickcpsErrFlat')
   HDF5.h5write(outfilepath, "MassList", masslistMasses)
   println("Wrote $(length(masslistMasses)) masses to file.")
+  HDF5.h5write(outfilepath, "MassListIntegrationBordersLow", massborders.lowMass)
+  HDF5.h5write(outfilepath, "MassListIntegrationBordersHigh", massborders.highMass)
+
+  HDF5.h5write(outfilepath, "MassListIdx", TOFFunctions.mass2timebin(masslistMasses, referenceMassScaleMode, referenceMassScaleParameters))
+  HDF5.h5write(outfilepath, "MassListIntegrationBordersIdxLow", TOFFunctions.mass2timebin(massborders.lowMass, referenceMassScaleMode, referenceMassScaleParameters))
+  HDF5.h5write(outfilepath, "MassListIntegrationBordersIdxHigh", TOFFunctions.mass2timebin(massborders.highMass, referenceMassScaleMode, referenceMassScaleParameters))
+  HDF5.h5write(outfilepath, "MassCalibMode", referenceMassScaleMode)
+  HDF5.h5write(outfilepath, "MassCalibParameters", referenceMassScaleParameters)
+
   HDF5.h5write(outfilepath, "AvgStickCpsTimes", timeFlat)
   HDF5.h5write(outfilepath, "MassAxis", referenceMassAxis)
   if onlyUseAverages

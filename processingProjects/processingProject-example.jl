@@ -35,7 +35,7 @@ correctMassScaleAndExtractSumSpec(
     plotControlMass = false,
     firstNFiles=0,
     lastNFiles = 0,
-    binWidth=4
+    massBorderCalculation = 1,
     )
 
 baselineAndPeakshape(
@@ -45,7 +45,6 @@ baselineAndPeakshape(
     peakfindingNoiseThresholdValue = 25
     )
 
-deconvolute(
-    fp,
-    binWidth=4
+mtrx = deconvolute(
+    fp
     )
