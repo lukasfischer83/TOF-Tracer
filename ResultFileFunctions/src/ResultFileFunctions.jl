@@ -285,7 +285,7 @@ function findChangingMasses(masses, compositions, traces, times, bgTimesSelectio
   selMasses =  (means .> sigmaThreshold*stderror)
   if filterCrosstalkMasses
       # Filter out crosstalk masses
-      s = filterMassListByContribution2(masses, means, 5000, 0.05)
+      s = MasslistFunctions.filterMassListByContribution2(masses, means, 5000, 0.05)
       selMasses = selMasses & s
   end
   println("\nRemoving $(length(masses[!s])) masses")
