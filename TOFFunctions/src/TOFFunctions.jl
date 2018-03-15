@@ -209,20 +209,11 @@ end
 function getTimeFromFile(filename)
 
   # TODO: Replace with Aquisition log Start Time (Windows Timestamp)
-  #=
-  f = h5py.File(filename, "r")
-  aqLog = f["AcquisitionLog"]["Log"]
-  logEntryDescription = aqLog[1][3]
-  time_windowsTimestamp = aqLog[1][1][1]
-  println("Win Timestamp detected: $time_windowsTimestamp")
-  t=DateTime()
-  if logEntryDescription =="Acquisition started" # "Acquisition started"
+    time_windowsTimestamp = HDF5.h5read(filename, "/AcquisitionLog/Log")[1].data[1]
     tUnix = time_windowsTimestamp/(10.0*1000.0*1000.0)-11644473600.0
     println("tUnix has size $(size(tUnix))")
     t = Dates.unix2datetime(tUnix)#[1]
-  else
-    println("Error: could not find start time in $filename/AcquisitionLog/Log\n...trying to use timestamp string from attributes")
-    =#
+    #=
     attributesRoot = HDF5.h5readattr(filename, "/")
     time_s = attributesRoot["HDF5 File Creation Time"]
     acq_card = attributesRoot["DAQ Hardware"]
@@ -232,9 +223,7 @@ function getTimeFromFile(filename)
     else
       t = DateTime(time_s, "d/m/y H:M:S") # PTR3
     end
-
-  #end
-  #f[:close]()
+=#
   return t
 end
 
