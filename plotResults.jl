@@ -8,7 +8,7 @@ import InterpolationFunctions
 import  MasslistFunctions
 using ResultFileFunctions
 
-include("plotRunsCloud10.jl")
+#include("plotRunsCloud10.jl")
 #include("plotRunsCloud12.jl")
 #include("plotRunsCloud11.jl")
 #file="/data/CLOUDX/running1/run1715/results/_result.hdf5"
@@ -25,14 +25,15 @@ include("plotRunsCloud10.jl")
 #file = "/home/lukas/tmp/repacked.h5"
 #file = "/data/CLOUD11/running1/Martin-AP-IP-Pinonaldehyd/results/_result_Martin_Pinonaldehyde_eva.hdf5"
 #file = "/data/CLOUD11/running1/sortedByPrecursor/1807-apinene-isoprene-bcary/results/_result.hdf5"
-file = "/data/CLOUD11/Calibs/geordnet/STD1/1ppb/results/_result_wide.hdf5"
+#file = "/data/CLOUD11/Calibs/geordnet/STD1/1ppb/results/_result_wide.hdf5"
+file = "ExampleFiles/TOFDATA/results/_result.hdf5"
 
-plotHighTimeRes = false
+plotHighTimeRes = true
 plotFittedInsteadOfSummed = true # Use multi peak fitted data instead of raw
 smoothing = 1
 reconstruct = false
 plotsymbol = "-"
-isobarToPlot = 101
+isobarToPlot = 0
 #timedelay = Dates.Hour(0) # CLOUD12, ...
 timedelay = Dates.Hour(1) # CLOUDX, CLOUD11
 
@@ -78,7 +79,7 @@ massesToPlot = [
 #H3OH2O[1]
 #H3OH2OH2O[1]
 
-#APINENE[1]
+APINENE[1]
 #massFromComposition(C=8, H=10)
 #massFromComposition(C=6, H=12, O=1)
 #massFromComposition(C=4, H=8, O=1)
@@ -152,7 +153,7 @@ massesToPlot = [
 #createCompound(C=6, H=11, N=1, O=1)[1]
 
 BCARY[1]
-HEXANONE[1]
+#HEXANONE[1]
 #Nitrates
 #C15H23NO4[1]
 #C13H19NO6[1]
@@ -227,7 +228,7 @@ ylabel("Signal [cps]")
 
 legStrings = []
 for i = 1:length(measResult.MasslistMasses)
-  push!(legStrings,"m/z $(round(measResult.MasslistMasses[i],3)) - $(sumFormulaStringFromCompositionArray(measResult.MasslistCompositions[:,i]))")
+  push!(legStrings,"m/z $(round(measResult.MasslistMasses[i],3)) - $(MasslistFunctions.sumFormulaStringFromCompositionArray(measResult.MasslistCompositions[:,i]))")
 end
 
 box = ax[:get_position]()
@@ -240,7 +241,7 @@ legend(legStrings, loc="center left", bbox_to_anchor=(1, 0.5), ncol=cols)
 #legend(legStrings, ncol=cols)
 ax[:yaxis][:grid]("on", which="minor")
 
-plotStages(measResult.Times[1], measResult.Times[end])
+#plotStages(measResult.Times[1], measResult.Times[end])
 #plotStagesNames(measResult.Times[1], measResult.Times[end])
 
 

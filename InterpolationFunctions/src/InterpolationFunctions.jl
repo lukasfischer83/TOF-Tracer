@@ -38,19 +38,19 @@ function interpolate(x::AbstractFloat, yAxis)
 end
 
 function interpolate(x::AbstractArray, xAxis, yAxis)
-  y = SharedArray{Float64}(length(x))
-  @sync @parallel for i = 1 : length(x)
+  y = Array{Float64}(length(x))
+  Threads.@threads for i = 1 : length(x)
     y[i] = InterpolationFunctions.interpolate(x[i],xAxis,yAxis)
   end
-  return convert(Array,y)
+  return y #convert(Array,y)
 end
 
 function interpolate(x::AbstractArray, yAxis)
-  y = SharedArray{Float64}(length(x))
-  @sync @parallel for i = 1 : length(x)
+  y = Array{Float64}(length(x))
+  Threads.@threads for i = 1 : length(x)
     y[i] = InterpolationFunctions.interpolate(x[i],yAxis)
   end
-  return convert(Array,y)
+  return y #convert(Array,y)
 end
 
 function interpolatedSum(startX::AbstractFloat, endX::AbstractFloat, xAxis, yAxis)

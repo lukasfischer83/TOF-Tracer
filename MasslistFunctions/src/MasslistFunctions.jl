@@ -106,14 +106,14 @@ function loadMasslist(filename)
   list = readdlm(filename, '\t', skipstart=7)
   masses = Array{Float64}(0)
   masslistCompositions = []
-
+  print("Unidentified Peaks found in masslist $filename: ")
   for i=1:size(list,1)
     if sum(list[i,1:8]) > 0
       push!(masses,massFromCompositionArray(list[i,1:8]))
       push!(masslistCompositions, list[i,1:8])
     else
         if list[i,9] > 0
-        println("Unidentified Peak found in masslist $filename: $(list[i,9])")
+        print("$(list[i,9]) ")
         push!(masses,list[i,9])
         push!(masslistCompositions, list[i,1:8])
         end
@@ -149,7 +149,7 @@ function isotopesFromComposition(; C=0, C13=0, H=0, Hplus=1, N=0, O=0, O18=0, S=
     push!(abundances, abundance)
   end
   if (length(masses) == 1 && masses[1] == 0)
-    println("Strange composition found, maybe unidintified compound: $(compositions[1])")
+    println("Strange composition found, maybe unidentified compound: $(compositions[1])")
   end
   return masses, masslistElements, compositions, abundances
 end

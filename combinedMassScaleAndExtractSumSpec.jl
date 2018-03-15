@@ -1,5 +1,6 @@
 push!(LOAD_PATH, pwd())
 
+
 import HDF5
 import PyPlot
 import TOFFunctions
@@ -20,7 +21,7 @@ function correctMassScaleAndExtractSumSpec(
   debuglevel=3,
   searchWidth = 0.7, # Width of Mass Scale Search Regions in AMU
   dynamicMassScaleCorrection = true,
-  recalibInterval = 61,
+  recalibInterval = 60,
   peakshapeRegions = 10,
   createTotalAvg = true, # Needed for manualPeakFitter, not needed for timetraces
   onlyUseAverages = false, # Fast mode using only total file averages instead of individual spectra in file
@@ -28,7 +29,7 @@ function correctMassScaleAndExtractSumSpec(
   plotControlMass = false, # plot the control mass peak for each file after correction
   testRangeStart = 137.0, # the mass shift of this region will be shown if plot control mass is set true. Should not be part of calibRegions
   testRangeEnd = 137.5,
-  massBorderCalculation = 2, # How to calculate borders? 0 = Cernter -0.1 to Center + 0.4,  1 = based on resolution, 2 = constant bin width
+  massBorderCalculation = 1, # How to calculate borders? 0 = Cernter -0.1 to Center + 0.4,  1 = based on resolution and peak distance, 2 = constant bin width
   binWidth = 6,
   resolution = 7500)
 
@@ -88,12 +89,17 @@ function correctMassScaleAndExtractSumSpec(
   for i=1:length(referenceMassAxis)
       referenceMassAxis[i] = TOFFunctions.timebin2mass(i, referenceMassScaleMode, referenceMassScaleParameters)
   end
-  totalAvgSpectrum = SharedArray{Float64}(length(referenceSpectrum))
-  totalAvgSubSpectrum = SharedArray{Float64}(length(referenceSpectrum))
-  totalMinSpectrum = SharedArray{Float64}(length(referenceSpectrum))
-  totalMaxSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+  #totalAvgSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+  #totalAvgSubSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+  #totalMinSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+  #totalMaxSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+  totalAvgSpectrum = Array{Float64}(length(referenceSpectrum))
+  totalAvgSubSpectrum = Array{Float64}(length(referenceSpectrum))
+  totalMinSpectrum = Array{Float64}(length(referenceSpectrum))
+  totalMaxSpectrum = Array{Float64}(length(referenceSpectrum))
 
-  @sync @parallel for i = 1 : length(referenceSpectrum)
+  #@sync @parallel
+  for i = 1 : length(referenceSpectrum)
     totalAvgSpectrum[i] = 0
     totalAvgSubSpectrum[i] = 0
     totalMinSpectrum[i] = 1e99
@@ -108,8 +114,10 @@ function correctMassScaleAndExtractSumSpec(
   intensities = zeros(Float64,(length(calibRegions),nFiles))
   monitorTimetrace = zeros(nFiles)
 
-  time = SharedArray{DateTime}(nFiles)
-  stickcps=SharedArray{Float64}(nMasses,nFiles)
+  #time = SharedArray{DateTime}(nFiles)
+  #stickcps=SharedArray{Float64}(nMasses,nFiles)
+  time = Array{DateTime}(nFiles)
+  stickcps=Array{Float64}(nMasses,nFiles)
 
   # Calculate Integration Borders
   if (massBorderCalculation == 0)
@@ -123,11 +131,12 @@ function correctMassScaleAndExtractSumSpec(
 
 
   if (plotControlMass == true)
-    figure()
+    PyPlot.figure()
   end
 
   if (createTotalAvg == true)
-    interpolatedSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+      #interpolatedSpectrum = SharedArray{Float64}(length(referenceSpectrum))
+      interpolatedSpectrum = Array{Float64}(length(referenceSpectrum))
   end
 
   ############## Check output path and remove existing files #####################
@@ -170,6 +179,11 @@ function correctMassScaleAndExtractSumSpec(
 
   for j=1:nFiles
     totalPath = joinpath(filepath, files[j])
+    if j < nFiles
+        totalPrecachePath = joinpath(filepath, files[j+1])
+    else
+        totalPrecachePath = ""
+    end
     if debuglevel > 0   println("Processing File $j/$nFiles :  $totalPath") end
 
     fileIsBad = false;
@@ -182,11 +196,13 @@ function correctMassScaleAndExtractSumSpec(
 
     #if debuglevel > 0   println("Processing File $totalPath") end
     if (createTotalAvg == true && !fileIsBad)
+      print("Spectrum interpolation for total average... ")
       indexesExact = TOFFunctions.mass2timebin(referenceMassAxis, referenceMassScaleMode, newParams)
       interpolatedSpectrum = InterpolationFunctions.interpolate(indexesExact,avgSpectrum)
       totalAvgSpectrum += interpolatedSpectrum
       # calculate min and max spectra
-      @sync @parallel for bin=1:length(interpolatedSpectrum)
+      #@sync @parallel
+      for bin=1:length(interpolatedSpectrum)
         if interpolatedSpectrum[bin] > totalMaxSpectrum[bin]
           totalMaxSpectrum[bin] = interpolatedSpectrum[bin]
         end
@@ -202,8 +218,10 @@ function correctMassScaleAndExtractSumSpec(
           HDF5.set_dims!(dsetAvgSumSpecs, (dsAvgSumWidth,currDims+1)::Dims)
         end
       end
+      println("DONE")
     end
     if debuglevel > 1   println() end
+    print("Average Stick integration... ")
     for i=(1:nMasses)
       #if debuglevel > 0   println("Processing region mass($(mlow[i]):$(mhigh[i])) --> timebin($(round(TOFFunctions.mass2timebin(mlow[i],massCalibMode,newParams))):$(round(TOFFunctions.mass2timebin(mhigh[i],massCalibMode,newParams))))") end
       if (massBorderCalculation == 2)
@@ -220,27 +238,31 @@ function correctMassScaleAndExtractSumSpec(
       end
       stickcps[i,j] = raw
     end
+    println("DONE")
     if (!onlyUseAverages)
       spectrumMultFactor = TOFFunctions.getSpecMultiplicator(totalPath)
-      subSpecStickCps = SharedArray{Float32}(nMasses)
+      #subSpecStickCps = SharedArray{Float32}(nMasses)
+      subSpecStickCps = Array{Float32}(nMasses)
       totalSubSpectra = TOFFunctions.getSubSpectraCount(totalPath)
 
       ################## prepare arrays for averaging #########################
-      fileInternalLocalAvg = TOFFunctions.getSubSpectrumFromFile(totalPath,1)
+      fileInternalLocalAvg = TOFFunctions.getSubSpectrumFromFile(totalPath,1, preloadFile=totalPrecachePath)
       #println("referenceSpectrum is a $(summary(referenceSpectrum))")
       #println("SubSpec is a $(summary(fileInternalLocalAvg))")
       #println("spectrumMultFactor is a $(summary(spectrumMultFactor))")
+      print("Sub spectrum Stick integration... ")
 
       fill!(fileInternalLocalAvg,0)
       fileInternalLocalAvgCount = 0
+      print("Precalculating average for mass scale correction... ")
       ################## Get First Set of Spectra for first mass scale calib
       if totalSubSpectra >= recalibInterval
         # Prepare first calib beforehead
-        fileInternalLocalAvg = TOFFunctions.getSubSpectrumFromFile(totalPath,1)
+        fileInternalLocalAvg = TOFFunctions.getSubSpectrumFromFile(totalPath,1, preloadFile=totalPrecachePath)
         for avgIdx=2:minimum([recalibInterval totalSubSpectra])
-          fileInternalLocalAvg += TOFFunctions.getSubSpectrumFromFile(totalPath,avgIdx)
+          fileInternalLocalAvg += TOFFunctions.getSubSpectrumFromFile(totalPath,avgIdx, preloadFile=totalPrecachePath)
         end
-        newParams, success, tbs, ins = TOFFunctions.recalibrateMassScale(fileInternalLocalAvg*spectrumMultFactor, referenceSpectrum, calibRegions, searchWidth, referenceMassScaleMode, referenceMassScaleParameters)
+        newParams, success, tbs, ins = TOFFunctions.recalibrateMassScale(fileInternalLocalAvg, referenceSpectrum, calibRegions, searchWidth, referenceMassScaleMode, referenceMassScaleParameters)
         ######
         fill!(fileInternalLocalAvg,0)
         fileInternalLocalAvgCount = 0
@@ -249,15 +271,15 @@ function correctMassScaleAndExtractSumSpec(
 
       ################### Loop over Subspectra Start ########################
       ################### Averaging and Mass Scale Calib ####################
-
+      print("Recalibrating at: ")
       specCount += totalSubSpectra
       for subSpecIdx=1:totalSubSpectra
-        subSpectrum = TOFFunctions.getSubSpectrumFromFile(totalPath,subSpecIdx)
+        subSpectrum = TOFFunctions.getSubSpectrumFromFile(totalPath,subSpecIdx, preloadFile=totalPrecachePath)
         fileInternalLocalAvg += subSpectrum
         fileInternalLocalAvgCount += 1
 
         if (fileInternalLocalAvgCount > recalibInterval) || fileInternalLocalAvgCount == totalSubSpectra
-          println("      Recalibrating at $subSpecIdx")
+          print("$subSpecIdx...")
           newParams, success, tbs, ins = TOFFunctions.recalibrateMassScale(fileInternalLocalAvg, referenceSpectrum, calibRegions, searchWidth, referenceMassScaleMode, referenceMassScaleParameters)
 
           indexesExact = TOFFunctions.mass2timebin(referenceMassAxis, referenceMassScaleMode, newParams)
@@ -269,7 +291,8 @@ function correctMassScaleAndExtractSumSpec(
           fileInternalLocalAvgCount = 0
         end
         ################## Peak Integration ################################
-        @sync @parallel for i=(1:nMasses)
+        #@sync @parallel
+        Threads.@threads for i=(1:nMasses)
           if (mod(i,100) == 0)
             #println("Processing mass $(masslistMasses[i])")
           end
@@ -306,6 +329,7 @@ function correctMassScaleAndExtractSumSpec(
           HDF5.set_dims!(dsetStickCpsErr, (currDimsTime+1,dsStickCpsWidth)::Dims)
         end
       end
+      println("DONE")
     end
     println("###################################################################\n\n")
   end

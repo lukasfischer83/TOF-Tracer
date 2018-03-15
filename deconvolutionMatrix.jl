@@ -61,10 +61,10 @@ function deconvolute(
 
 
 
-    sparseMtrx = mtrx
     print("Inverting Matrix...")
     tic()
-    deconvolutionMatrix = inv(sparseMtrx)
+    deconvolutionMatrix = sparse(inv(mtrx)) # sparse on one processor is as fast as dense on mp, --> choosing less power consumption.
+    #deconvolutionMatrix = (inv(mtrx)) # there seems to be no multithread support for sparse matrix multiplication, still sparse is same speed
     toc()
     println(" DONE")
 
@@ -131,14 +131,16 @@ function deconvolute(
       if toProcessHigh > nbrSpectra
         toProcessHigh = nbrSpectra
       end
-      println("Correcting spectrum $toProcessLow to $toProcessHigh of $nbrSpectra")
-      samplesSubRange = convert(SharedArray, ResultFileFunctions.getTraceSamples(file,toProcessLow:toProcessHigh, raw=true)[:,selector])
-
+      print("Correcting spectrum $toProcessLow to $toProcessHigh of $nbrSpectra: Loading...")
+      #samplesSubRange = convert(SharedArray, ResultFileFunctions.getTraceSamples(file,toProcessLow:toProcessHigh, raw=true)[:,selector])
+      samplesSubRange = ResultFileFunctions.getTraceSamples(file,toProcessLow:toProcessHigh, raw=true)[:,selector]
+      print("Deconvoluting...")
       for i=1:(toProcessHigh - toProcessLow + 1)
         #traces[i,:] = deconvolutionMatrix * traces[i,:]
         #tracesErrors[i,:] = abs(deconvolutionMatrix) * sqrt(abs(traces[i,:])/5)
         dset[toProcessLow - 1 + i,:] = deconvolutionMatrix *samplesSubRange[i,:]
       end
+      println("DONE")
     end
     #HDF5.h5write(file, "CorrStickCps", convert(Array,traces))
     #HDF5.h5write(file, "CorrStickCpsErrors", tracesErrors)
@@ -173,5 +175,5 @@ function deconvolute(
   #else
   #  traces = HDF5.h5read(file, "CorrAvgStickCps")[:,selector]
   #end
-  return sparseMtrx
+  return deconvolutionMatrix
 end

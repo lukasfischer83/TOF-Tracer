@@ -1,8 +1,8 @@
 __precompile__()
 module TOFFunctions
-using HDF5
-using InterpolationFunctions
-using PyPlot
+import HDF5
+import InterpolationFunctions
+import PyPlot
 
 SPEC_CACHE_SIZE_LIMIT = 1e9
 
@@ -18,8 +18,11 @@ type h5cache
     content
 end
 
+
 timeCache = h5cache("",0)
 spectraCache = h5cache("",0)
+preloadFilename = ""
+preloadFuture = 0
 
 # HELPER @everywhere functionS #
 function mass2timebin(mass::Number,mode,parameters)
@@ -62,7 +65,7 @@ function timebin2mass(time::AbstractArray,mode,parameters)
 end
 
 function getMassCalibParametersFromFile(filename)
-    attributesFullSpectra = h5readattr(filename, "/FullSpectra")
+    attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
     mcm = attributesFullSpectra["MassCalibMode"]
     massCalibMode = mcm[1]
@@ -86,13 +89,13 @@ end
 function getAvgSpectrumFromFile(filename)
   #println("Getting avg spectrum from $filename")
 
-  attributesRoot = h5readattr(filename, "/")
-  attributesFullSpectra = h5readattr(filename, "/FullSpectra")
+  attributesRoot = HDF5.h5readattr(filename, "/")
+  attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
   H5NbrWrites = attributesRoot["NbrWrites"]
   H5NbrBufs = attributesRoot["NbrBufs"]
   H5NbrWaveForms = attributesRoot["NbrWaveforms"]
-  H5TofPeriod = h5readattr(filename, "/TimingData")["TofPeriod"]
+  H5TofPeriod = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"]
   H5NbrSegments = attributesRoot["NbrSegments"]
   H5NbrBlocks = attributesRoot["NbrBlocks"]
 
@@ -112,43 +115,70 @@ function getSubSpectraCount(filename)
   ds = fh["/FullSpectra/TofData"]
   l=size(ds)[3]
   m=size(ds)[4]
-  close(fh)
+  HDF5.close(fh)
   return l*m
 end
 
-function getSubSpectrumFromFile(filename, index)
-  #allSpectra = HDF5.h5read(totalPath, "/FullSpectra/TofData")
-  #allSpectraTimes = HDF5.h5read(totalPath, "/TimingData/BufTimes")
-  #k=1:size(allSpectra)[2], m=1:size(allSpectra)[4], l=1:size(allSpectra)[3]
-  #allSpectraTimes = HDF5.h5read(filename, "/TimingData/BufTimes")
+function loadWholeTofData(filename)
+    return HDF5.h5read(filename, "/FullSpectra/TofData")
+end
+
+function getSubSpectrumFromFile(filename, index; preloadFile = "")
+
   if spectraCache.filename != filename
-      fh = HDF5.h5open(filename,"r")
-      ds = fh["/FullSpectra/TofData"]
-      if prod(size(ds)) < SPEC_CACHE_SIZE_LIMIT
-          println("Caching spectra of $filename")
-          spectraCache.content = HDF5.h5read(filename, "/FullSpectra/TofData") #ds[:,:,:,:]
+      if TOFFunctions.preloadFilename == filename
+          print("Fetching Preload Future of $(filename)... ")
+          spectraCache.content = fetch(TOFFunctions.preloadFuture)
+          #println("Type returned: $(typeof(spectraCache.content))")
+          global preloadFuture = 0
           spectraCache.filename = filename
-          close(fh)
+          if typeof(spectraCache.content) == RemoteException
+              println("Precache error: $(spectraCache.content)")
+          end
+          println("DONE")
       else
-          (l,m) = ind2sub((size(ds)[3],size(ds)[4]), index)
-          subSpectrum = ds[:,1,l,m]
-          close(fh)
-          return subSpectrum
+          fh = HDF5.h5open(filename,"r")
+          ds = fh["/FullSpectra/TofData"]
+          global preloadFuture = 0
+          if prod(size(ds)) < SPEC_CACHE_SIZE_LIMIT
+              print("Caching spectra of $filename... ")
+              spectraCache.content = HDF5.h5read(filename, "/FullSpectra/TofData") #ds[:,:,:,:]
+              spectraCache.filename = filename
+              close(fh)
+              println("DONE")
+          else
+              (l,m) = ind2sub((size(ds)[3],size(ds)[4]), index)
+              subSpectrum = ds[:,1,l,m]
+              HDF5.close(fh)
+              return subSpectrum
+          end
       end
   end
+  if (preloadFile != "") && (preloadFile != TOFFunctions.preloadFilename) && (TOFFunctions.preloadFuture == 0) && (nprocs() >=2 )
+      fh = HDF5.h5open(preloadFile,"r")
+      ds = fh["/FullSpectra/TofData"]
+
+      if prod(size(ds)) < SPEC_CACHE_SIZE_LIMIT
+          global preloadFilename = preloadFile
+          global preloadFuture = remotecall(loadWholeTofData, 2, preloadFile)
+          println("Spawned Preload Task for next file")
+      end
+      HDF5.close(fh)
+  end
+
   (l,m) = ind2sub((size(spectraCache.content)[3],size(spectraCache.content)[4]), index)
   subSpectrum = spectraCache.content[:,1,l,m]
   return subSpectrum
 end
 
 function getSpecMultiplicator(filename)
-  attributesRoot = h5readattr(filename, "/")
-  attributesFullSpectra = h5readattr(filename, "/FullSpectra")
+  attributesRoot = HDF5.h5readattr(filename, "/")
+  attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
   H5NbrWrites = attributesRoot["NbrWrites"]
   H5NbrBufs = attributesRoot["NbrBufs"]
   H5NbrWaveForms = attributesRoot["NbrWaveforms"]
-  H5TofPeriod = h5readattr(filename, "/TimingData")["TofPeriod"]
+  H5TofPeriod = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"]
   H5NbrSegments = attributesRoot["NbrSegments"]
   H5NbrBlocks = attributesRoot["NbrBlocks"]
 
@@ -167,7 +197,7 @@ function getSubSpectrumTimeFromFile(filename, index)
         ds = fh["/TimingData/BufTimes"]
         timeCache.filename = filename
         timeCache.content = ds[:,:]
-        close(fh)
+        HDF5.close(fh)
     end
     (l,m) = ind2sub((size(timeCache.content)[1],size(timeCache.content)[2]), index)
     #println("Getting sub spectrum Time ($l,$m) from $filename")
@@ -193,10 +223,10 @@ function getTimeFromFile(filename)
   else
     println("Error: could not find start time in $filename/AcquisitionLog/Log\n...trying to use timestamp string from attributes")
     =#
-    attributesRoot = h5readattr(filename, "/")
+    attributesRoot = HDF5.h5readattr(filename, "/")
     time_s = attributesRoot["HDF5 File Creation Time"]
     acq_card = attributesRoot["DAQ Hardware"]
-    println(acq_card)
+    #println(acq_card)
     if (acq_card == "Cronologic HPTDC8-PCI")
       t = DateTime(time_s, "m/d/y H:M:S") # STOF
     else
@@ -218,7 +248,7 @@ function validateHDF5Files(filepath, files)
      try
         totalPath = joinpath(filepath, files[j])
         if debuglevel > 1 print("Checking $totalPath ... ") end
-        if (!ishdf5(totalPath))
+        if (!HDF5.ishdf5(totalPath))
           if debuglevel > 0   println("Bad File: $totalPath") end
           push!(badFiles,files[j])
         else
@@ -233,7 +263,7 @@ function validateHDF5Files(filepath, files)
             if debuglevel > 0   println("Bad File: $totalPath") end
             push!(badFiles,files[j])
           end
-          close(fh)
+          HDF5.close(fh)
         end
     catch
         println("File seems corrupt: $(files[j])")
@@ -302,13 +332,11 @@ function setMassScaleReferenceSpectrum(referenceSpectrum, calibRegions, searchWi
 end
 
 function recalibrateMassScale(spectrum, referenceSpectrum, calibRegions, searchWidth, massCalibMode, massCalibParameters)
-#println("calibRegions: $m_calibRegions")
-print(".")
 success = true
 
-A = SharedArray{Float64}(length(m_calibRegions),2)
+A = Array{Float64}(length(m_calibRegions),2)
 A[:,2] = 1
-B = SharedArray{Float64}(length(m_calibRegions),1)
+B = Array{Float64}(length(m_calibRegions),1)
 
 timebinshifts = zeros(length(m_calibRegions))
 intensities = zeros(length(m_calibRegions))
@@ -366,7 +394,7 @@ for regionindex=1:length(m_calibRegions)
     crNewInterpolatedValues = zeros(crOriginalMasses)
     indexesExact = TOFFunctions.mass2timebin(crOriginalMasses, m_referenceMassScaleMode, newParams)
     crNewInterpolatedValues = InterpolationFunctions.interpolate(indexesExact,spectrum)
-    plot(crOriginalMasses, crNewInterpolatedValues/maximum(crNewInterpolatedValues),".-")
+    PyPlot.plot(crOriginalMasses, crNewInterpolatedValues/maximum(crNewInterpolatedValues),".-")
   end
 return newParams, success, timebinshifts, intensities
 end

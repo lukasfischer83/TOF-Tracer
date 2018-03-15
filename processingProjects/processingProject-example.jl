@@ -1,9 +1,4 @@
-@everywhere scriptspath =  pwd()
-@everywhere include("$(scriptspath)/manualMassLibrary.jl")
-@everywhere include("$(scriptspath)/combinedMassScaleAndExtractSumSpec.jl")
-@everywhere include("$(scriptspath)/peakShape.jl")
-@everywhere include("$(scriptspath)/deconvolutionMatrix.jl")
-
+include("$(pwd())/startup.jl")
 
 fp = "./ExampleFiles/TOFDATA/" # All files in this path will be processed
 filefilterRegexp = r"\.h5$"
@@ -32,10 +27,9 @@ correctMassScaleAndExtractSumSpec(
     cr,
     filefilterRegexp=filefilterRegexp,
     onlyUseAverages = false,
-    plotControlMass = false,
+    plotControlMass = true,
     firstNFiles=0,
     lastNFiles = 0,
-    massBorderCalculation = 1,
     )
 
 baselineAndPeakshape(

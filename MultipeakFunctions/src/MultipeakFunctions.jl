@@ -15,7 +15,7 @@ function createPeakPattern(mass, composition, massScaleMode, massScaleParameters
     if sum(composition) > 0
       isotopeMasses, isotopeMasslistElements, isotopeCompositions, isotopeAbundances = MasslistFunctions.isotopesFromCompositionArray(composition)
     else
-      println("Unidentified Peak at mass $(mass)")
+      #println("Unidentified Peak at mass $(mass)")
       isotopeMasses = [mass]
       isotopeAbundances = [1]
     end
