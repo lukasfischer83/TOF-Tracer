@@ -158,7 +158,7 @@ function correctMassScaleAndExtractSumSpec(
     dsAvgSumWidth = length(referenceSpectrum)
     dspaceAvgSumSpecs = HDF5.dataspace((dsAvgSumWidth,1)::Dims, max_dims=(dsAvgSumWidth,typemax(Int64)))
     dtypeAvgSumSpecs = HDF5.datatype(Float32)
-    dsetAvgSumSpecs = HDF5.d_create(fid, "SumSpecs", dtypeAvgSumSpecs, dspaceAvgSumSpecs, "chunk", (dsAvgSumWidth,1))
+    dsetAvgSumSpecs = HDF5.d_create(fid, "SumSpecs", dtypeAvgSumSpecs, dspaceAvgSumSpecs, "chunk", (dsAvgSumWidth,1), "compress", 3)
   end
 
   if (!onlyUseAverages)
@@ -166,8 +166,8 @@ function correctMassScaleAndExtractSumSpec(
     dsStickCpsWidth = nMasses
     dspaceStickCps = HDF5.dataspace((1,dsStickCpsWidth)::Dims, max_dims=(typemax(Int64),dsStickCpsWidth))
     dtypeStickCps = HDF5.datatype(Float32)
-    dsetStickCps = HDF5.d_create(fid, "StickCps", dtypeStickCps, dspaceStickCps, "chunk", (1,dsStickCpsWidth))
-    dsetStickCpsErr = HDF5.d_create(fid, "StickCpsErr", dtypeStickCps, dspaceStickCps, "chunk", (1,dsStickCpsWidth))
+    dsetStickCps = HDF5.d_create(fid, "StickCps", dtypeStickCps, dspaceStickCps, "chunk", (1,dsStickCpsWidth), "compress", 3)
+    dsetStickCpsErr = HDF5.d_create(fid, "StickCpsErr", dtypeStickCps, dspaceStickCps, "chunk", (1,dsStickCpsWidth), "compress", 3)
 
     dspaceTimes = HDF5.dataspace((1,)::Dims, max_dims=(typemax(Int64),))
     dtypeTimes = HDF5.datatype(Float64)

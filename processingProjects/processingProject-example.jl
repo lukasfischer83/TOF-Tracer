@@ -29,7 +29,7 @@ correctMassScaleAndExtractSumSpec(
     onlyUseAverages = false,
     plotControlMass = true,
     firstNFiles=0,
-    lastNFiles = 0,
+    lastNFiles = 0
     )
 
 baselineAndPeakshape(
@@ -40,5 +40,6 @@ baselineAndPeakshape(
     )
 
 mtrx = deconvolute(
-    fp
+    fp,
+    calcTransposed = true
     )

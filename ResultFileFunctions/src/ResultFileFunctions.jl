@@ -3,7 +3,7 @@ module ResultFileFunctions
 using HDF5
 import  MasslistFunctions
 
-export MeasurementResult, joinResultsTime, joinResultsMasses, getTraces, getTimetraces, getNbrTraces, getTraceSamples, getNbrTraceSamples, findChangingMasses, saturationFromComposition, getIndicesInTimeframe
+export MeasurementResult, joinResultsTime, joinResultsMasses, getTraces, getTimetraces, transposeStickCps, getNbrTraces, getTraceSamples, getNbrTraceSamples, findChangingMasses, saturationFromComposition, getIndicesInTimeframe
 
 type MeasurementResult
     Times
@@ -133,6 +133,8 @@ function getIndicesInTimeframe(filename, startTime::DateTime, endTime::DateTime)
 end
 
 function getTraces(filename; timeIndexStart=1, timeIndexEnd=0, massIndices=nothing, raw=false,  useAveragesOnly = false)
+  dsTexists = false
+
   fh = HDF5.h5open(filename,"r")
   if useAveragesOnly
     if raw
@@ -145,6 +147,13 @@ function getTraces(filename; timeIndexStart=1, timeIndexEnd=0, massIndices=nothi
       ds = fh["StickCps"]
     else
       ds = fh["CorrStickCps"]
+      if HDF5.exists(fh, "CorrStickCpsT")
+          dsTexists = true
+          println("A transposed dataset for faster loading is available.")
+          dsT = fh["CorrStickCpsT"]
+      else
+          println("Transposed dataset for faster loading is NOT available. You can create one with ResultFileFunctions.transposeStickCps(filename).")
+      end
     end
   end
   result = 0
@@ -166,12 +175,21 @@ function getTraces(filename; timeIndexStart=1, timeIndexEnd=0, massIndices=nothi
   if ((timeIndexStart>0) & (timeIndexEnd<=size(ds)[1])) & (minimum(massIndices)>0) & (maximum(massIndices)<=size(ds)[2])
     result = similar(ds[1,1],(timeIndexEnd-timeIndexStart+1),length(massIndices))
     println("Creating result Matrix with size $(size(result))")
-    if length(massIndices) < 100
-        for j=1:length(massIndices)
-            result[:,j] = ds[timeIndexStart:timeIndexEnd,massIndices[j]]
-            #println("Loaded $((timeIndexEnd-timeIndexStart)*j) samples")
+    if length(massIndices) < size(ds)[2]
+        println("Subset of masses requested")
+        if dsTexists
+            println("Loading from transposed dataset.")
+            for j=1:length(massIndices)
+                result[:,j] = dsT[massIndices[j],timeIndexStart:timeIndexEnd]
+            end
+        else
+            for j=1:length(massIndices)
+                result[:,j] = ds[timeIndexStart:timeIndexEnd,massIndices[j]]
+                #println("Loaded $((timeIndexEnd-timeIndexStart)*j) samples")
+            end
         end
     else
+        println("Many masses requested, slicing time first for better performance")
         for j=timeIndexStart:timeIndexEnd
             tmp = ds[j,:]
             result[j-timeIndexStart+1,:] = tmp[massIndices]
@@ -217,6 +235,38 @@ function getTimetraces(filename, indices; raw=false)
   close(fh)
   return result
 end
+
+function transposeStickCps(filename)
+  fh = HDF5.h5open(filename,"r+")
+  if HDF5.exists(fh, "CorrStickCpsT")
+      HDF5.o_delete(fh,"CorrStickCpsT")
+  end
+  dsOld = fh["CorrStickCps"]
+  nbrSpectra, nbrMasses = size(dsOld)
+  dsNew = HDF5.d_create(fh, "CorrStickCpsT", HDF5.datatype(Float32), HDF5.dataspace(nbrMasses, nbrSpectra), "chunk", (1,nbrSpectra), "compress", 3)
+  spectraAtOnce = 10000
+  for i=1:Int(floor(nbrSpectra/spectraAtOnce))
+      startIdx = (i-1)*spectraAtOnce + 1
+      endIdx = i*spectraAtOnce
+      print("Transposing Spectra $startIdx to $endIdx for faster loading...")
+      a=transpose(dsOld[startIdx:endIdx,:])
+      for j=1:nbrMasses
+          dsNew[j,startIdx:endIdx] = a[j,:]
+      end
+      println("DONE")
+  end
+  startIdx = (Int(floor(nbrSpectra/spectraAtOnce)))*spectraAtOnce + 1
+  endIdx = nbrSpectra
+  print("Transposing Spectra $startIdx to $endIdx for faster loading...")
+  a=transpose(dsOld[startIdx:endIdx,:])
+  for j=1:nbrMasses
+      dsNew[j,startIdx:endIdx] = a[j,:]
+  end
+  println("DONE")
+  close(fh)
+end
+
+
 
 function getTraceSamples(filename, indices; raw=false)
   fh = HDF5.h5open(filename,"r")

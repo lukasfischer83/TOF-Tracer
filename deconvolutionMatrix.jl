@@ -10,7 +10,8 @@ import InterpolationFunctions
 function deconvolute(
   filepath;
   outputfilename="results/_result.hdf5",
-  binWidth = 6
+  binWidth = 6,
+  calcTransposed = false
   )
   #binWidth += 1 # Maybe crosstalk is calculated from "<" while summing is done from "<=" ?? Gives better crostalk removal.
   file = joinpath(filepath, outputfilename)
@@ -112,6 +113,7 @@ function deconvolute(
   if HDF5.exists(fh, "CorrStickCps")
   HDF5.o_delete(fh,"CorrStickCps")
   end
+
   if HDF5.exists(fh, "CorrStickCpsErrors")
   HDF5.o_delete(fh,"CorrStickCpsErrors")
   end
@@ -121,7 +123,7 @@ function deconvolute(
 
     # Create empty Dataspace
     nbrSpectra = ResultFileFunctions.getNbrTraceSamples(file)
-    dset = HDF5.d_create(fh, "CorrStickCps", HDF5.datatype(Float32), HDF5.dataspace(nbrSpectra, length(masses)), "chunk", (1,length(masses)))
+    dset = HDF5.d_create(fh, "CorrStickCps", HDF5.datatype(Float32), HDF5.dataspace(nbrSpectra, length(masses)), "chunk", (1,length(masses)), "compress", 3)
 
     toProcessLow = 0
     toProcessHigh = 0
@@ -137,7 +139,7 @@ function deconvolute(
       print("Deconvoluting...")
       for i=1:(toProcessHigh - toProcessLow + 1)
         #traces[i,:] = deconvolutionMatrix * traces[i,:]
-        #tracesErrors[i,:] = abs(deconvolutionMatrix) * sqrt(abs(traces[i,:])/5)
+        #tracesErrors[i,:] = abs(deconvolutionMatrix) * sqrt(abs(traces[i,:])/5
         dset[toProcessLow - 1 + i,:] = deconvolutionMatrix *samplesSubRange[i,:]
       end
       println("DONE")
@@ -146,6 +148,10 @@ function deconvolute(
     #HDF5.h5write(file, "CorrStickCpsErrors", tracesErrors)
   end
   HDF5.close(fh)
+
+  if calcTransposed
+      ResultFileFunctions.transposeStickCps(file)
+  end
 
   fh = HDF5.h5open(file,"r+")
   if HDF5.exists(fh, "AvgStickCps")
