@@ -30,9 +30,9 @@ function exportTracesCSVLossCorr(saveFolderPath, elementNames, compositions, tim
   f = open("$saveFolderPath/ptr3tracesInletLossCorr.csv", "w")
   writedlm(f, hcat(["Time"], reshape(sumformulas,(1,length(sumformulas)))))
   if (average==0)
-    writedlm(f, hcat(times ,traces*corrfactor))
+    writedlm(f, hcat(times , (corrfactor.*traces' )' ))
   else
-    writedlm(f, hcat(averageSamples(times,average) ,averageSamples(traces*corrfactor,average)))
+    writedlm(f, hcat(averageSamples(times,average) ,(corrfactor.*(averageSamples(traces,average))' )' ))
   end
   close(f)
 end
