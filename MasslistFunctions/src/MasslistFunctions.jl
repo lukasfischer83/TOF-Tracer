@@ -290,11 +290,13 @@ function OScFromCompositionArray(compositions)
 end
 
 function findClosestMassIndex(mass, masses)
-  for i=1:length(masses)
-    if (isapprox(masses[i], mass, atol=0.00001))
-      return i
+    closestIndex::Int64 = 1
+    for i=1:length(masses)
+        if abs(masses[i]-mass)<abs(masses[closestIndex]-mass)
+            closestIndex = i
+        end
     end
-  end
+    return closestIndex
 end
 
 function findInCompositions(compositions, composition)

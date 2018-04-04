@@ -241,6 +241,7 @@ function correctMassScaleAndExtractSumSpec(
     println("DONE")
     if (!onlyUseAverages)
       spectrumMultFactor = TOFFunctions.getSpecMultiplicator(totalPath)
+      println("   spectrumMultFactor = $spectrumMultFactor")
       #subSpecStickCps = SharedArray{Float32}(nMasses)
       subSpecStickCps = Array{Float32}(nMasses)
       totalSubSpectra = TOFFunctions.getSubSpectraCount(totalPath)
@@ -292,7 +293,10 @@ function correctMassScaleAndExtractSumSpec(
         end
         ################## Peak Integration ################################
         #@sync @parallel
-        Threads.@threads for i=(1:nMasses)
+        #Threads.@threads
+        mbIndicesLowMass = TOFFunctions.mass2timebin(massborders.lowMass,referenceMassScaleMode,newParams)
+        mbIndicesHighMass = TOFFunctions.mass2timebin(massborders.highMass,referenceMassScaleMode,newParams)
+        for i=(1:nMasses)
           if (mod(i,100) == 0)
             #println("Processing mass $(masslistMasses[i])")
           end
@@ -306,9 +310,7 @@ function correctMassScaleAndExtractSumSpec(
             subSpecStickCps[i]=raw
           else
             #if debuglevel > 0   println("Processing region mass($(mlow[i]):$(mhigh[i])) --> timebin($(round(TOFFunctions.mass2timebin(mlow[i],massCalibMode,newParams))):$(round(TOFFunctions.mass2timebin(mhigh[i],massCalibMode,newParams))))") end
-            subIdxStartExact=TOFFunctions.mass2timebin(massborders.lowMass[i],referenceMassScaleMode,newParams)
-            subIdxEndExact = TOFFunctions.mass2timebin(massborders.lowMass[i],referenceMassScaleMode,newParams)
-            subSpecStickCps[i]= InterpolationFunctions.interpolatedSum(subIdxStartExact,subIdxEndExact,subSpectrum)
+            subSpecStickCps[i]= InterpolationFunctions.interpolatedSum(mbIndicesLowMass[i],mbIndicesHighMass[i],subSpectrum)
           end
         end
         rawTime = TOFFunctions.getSubSpectrumTimeFromFile(totalPath,subSpecIdx)

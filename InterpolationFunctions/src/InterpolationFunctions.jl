@@ -142,7 +142,7 @@ function averageSamples(data, averagePoints; dim=1)
     end
 end
 
-# Smoothing multidimensional array in one dimension
+# Smoothing multidimensional array in one dimension, choose α wisely ()
 function smooth(x, α; dim::Integer=1)
     s = similar(x)
     Rpre = CartesianRange(size(x)[1:dim-1])

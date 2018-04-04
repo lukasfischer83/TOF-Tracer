@@ -3,7 +3,7 @@ module ExportFunctions
 using InterpolationFunctions
 import  MasslistFunctions
 
-export exportTracesCSV, exportTracesCSVLossCorr
+export exportTracesCSV, exportTracesCSVLossCorr, toMatlabTime, fromMatlabTime
 
 function exportTracesCSV(saveFolderPath, elementNames, compositions, times, traces; average=0)
   sumformulas = MasslistFunctions.sumFormulaStringListFromCompositionArrayList(compositions)
@@ -35,6 +35,19 @@ function exportTracesCSVLossCorr(saveFolderPath, elementNames, compositions, tim
     writedlm(f, hcat(averageSamples(times,average) ,averageSamples(traces*corrfactor,average)))
   end
   close(f)
+end
+
+
+function toMatlabTime(t::DateTime)
+    timespan = ((t+Dates.Day(1)) - DateTime(0,1,1,0,0,0))
+    millis::Float64 = Dates.Millisecond(timespan)
+    return millis/24/3600/1000
+end
+
+function fromMatlabTime(timestamp::Number)
+    days=Int(floor(timestamp))
+    millisecondsRemainder = Int(round((timestamp-days)*24*3600*1000))
+    return DateTime(0,1,1,0,0,0)+Dates.Day(days-1)+Dates.Millisecond(millisecondsRemainder)
 end
 
 end

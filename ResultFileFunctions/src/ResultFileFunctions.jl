@@ -2,8 +2,9 @@ __precompile__()
 module ResultFileFunctions
 using HDF5
 import  MasslistFunctions
+import InterpolationFunctions
 
-export MeasurementResult, joinResultsTime, joinResultsMasses, getTraces, getTimetraces, transposeStickCps, getNbrTraces, getTraceSamples, getNbrTraceSamples, findChangingMasses, saturationFromComposition, getIndicesInTimeframe
+export MeasurementResult, joinResultsTime, joinResultsMasses, getTraces, getTimetraces, transposeStickCps, getNbrTraces, getTraceSamples, getNbrTraceSamples, findChangingMasses, findVaryingMasses, saturationFromComposition, getIndicesInTimeframe
 
 type MeasurementResult
     Times
@@ -238,6 +239,11 @@ end
 
 function transposeStickCps(filename)
   fh = HDF5.h5open(filename,"r+")
+  if ! HDF5.exists(fh, "CorrStickCps")
+      println("CorrStickCps not present, skipping transpose.")
+      HDF5.close(fh)
+      return
+  end
   if HDF5.exists(fh, "CorrStickCpsT")
       HDF5.o_delete(fh,"CorrStickCpsT")
   end
@@ -370,6 +376,69 @@ function findChangingMasses(masses, compositions, traces, times, bgTimesSelectio
   return selIndices[sorter], means[selIndices[sorter]], stderror[selIndices[sorter]]
 end
 
+function findVaryingMasses(masses, compositions, traces; minOxygen = 0, sigmaThreshold=3, sorting = "mean", noNitrogen = true, onlySaneMasses = true, filterCrosstalkMasses=true)
+  means = mean(traces,1)[1,:]
+  means[means.<=0] = 1e-99
+
+  println("Means received: $(size(means))")
+  if size(traces,1) < 3
+    println("Not enough points for variance! plotHighTimeRes = true ?")
+  end
+
+  tracesPrime = traces - InterpolationFunctions.smooth(traces, 0.01)
+  stderror = std(tracesPrime,1)[1,:] ./ sqrt(size(traces,2))
+  variances = var(traces,1)[1,:]
+  lastCount = length(masses)
+
+  selMasses =  (means .> sigmaThreshold*stderror)
+  println("Removed $(lastCount - sum(selMasses)) masses because mean<sigmaThreshold*stderr")
+  lastCount = sum(selMasses)
+  selMasses = selMasses & (variances .> means * sigmaThreshold)
+
+  println("Removed $(lastCount - sum(selMasses)) masses because variance<sigmaThreshold*mean")
+  lastCount = sum(selMasses)
+
+  if filterCrosstalkMasses
+      # Filter out crosstalk masses
+      s = MasslistFunctions.filterMassListByContribution2(masses, means, 5000, 0.05)
+      selMasses = selMasses & s
+  end
+
+  println("\nRemoved $(lastCount - sum(selMasses)) masses because of crosstalk with neighbors")
+  lastCount = sum(selMasses)
+
+
+  println("\nRemoving $(length(masses[!s])) masses")
+
+  if noNitrogen == true
+    selMasses = selMasses & (compositions[5,:] .== 0)
+  end
+
+  selMasses = selMasses & (compositions[6,:] .>= minOxygen)
+  #selMasses = selMasses| ((masses.>137.1) & (masses.<137.15))
+
+  ## Filter only sane masses
+  if onlySaneMasses
+    selMasses = selMasses & (compositions[3,:] .> 1*compositions[1,:]) # H:C > 1.3
+    selMasses = selMasses & (compositions[3,:] .< 2.2*compositions[1,:]) # H:C < 2.2
+    selMasses = selMasses & (compositions[6,:] .< 1.5*compositions[1,:]) # O:C < 1.5
+  end
+  println("Selected $(sum(ones(length(masses))[selMasses])) masses!")
+
+  selIndices = linearindices(masses)[selMasses]
+  if sorting == "mean"
+      println("Sorting masses by mean value!")
+      sorter = sortperm(means[selMasses], rev=true)
+  elseif sorting == "mass"
+      println("Sorting masses!")
+    sorter = sortperm(masses[selMasses], rev=false)
+  else
+      println("Not sorting.")
+    sorter = linearindices(masses)
+  end
+
+  return selIndices[sorter], means[selIndices[sorter]], stderror[selIndices[sorter]]
+end
 
 function saturationFromComposition(compositions)
   #return exp(10)*50000*exp.(-compositions[6,:]*5).*exp.(-compositions[1,:])

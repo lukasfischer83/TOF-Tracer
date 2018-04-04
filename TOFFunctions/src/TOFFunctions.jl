@@ -105,6 +105,7 @@ function getAvgSpectrumFromFile(filename)
   H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks.*H5NbrBufs.*H5NbrWrites .* 1e-9
 
   avgSpectrum = HDF5.h5read(filename, "FullSpectra/SumSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
+  #println("Avg Spec Multiplier = $(H5SampleInterval./H5SingleIonSignal./H5inttime)")
   return avgSpectrum
 end
 
@@ -175,19 +176,23 @@ function getSpecMultiplicator(filename)
   attributesRoot = HDF5.h5readattr(filename, "/")
   attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
-  H5NbrWrites = attributesRoot["NbrWrites"]
-  H5NbrBufs = attributesRoot["NbrBufs"]
-  H5NbrWaveForms = attributesRoot["NbrWaveforms"]
-  H5TofPeriod = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"]
-  H5NbrSegments = attributesRoot["NbrSegments"]
-  H5NbrBlocks = attributesRoot["NbrBlocks"]
+  #H5NbrWrites::Float32 = attributesRoot["NbrWrites"]
+  #H5NbrBufs::Float32 = attributesRoot["NbrBufs"]
+  H5NbrWaveForms::Float32 = attributesRoot["NbrWaveforms"][1]
+  H5TofPeriod::Float32 = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"][1]
+  H5NbrSegments::Float32 = attributesRoot["NbrSegments"][1]
+  H5NbrBlocks::Float32 = attributesRoot["NbrBlocks"][1]
 
-  H5SampleInterval = attributesFullSpectra["SampleInterval"] .* 1e9
-  H5SingleIonSignal = attributesFullSpectra["Single Ion Signal"]
+  H5SampleInterval::Float32 = attributesFullSpectra["SampleInterval"][1] .* 1.0e9
+  H5SingleIonSignal::Float32 = attributesFullSpectra["Single Ion Signal"][1]
 
-  H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks .* 1e-9
-
-  return (H5SampleInterval./H5SingleIonSignal./H5inttime)[1]
+  #H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks .* 1.0e-9
+  H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.* 1.0e-9 # laut Tanner keine Segments und Blocks
+  #println("H5inttime: $H5inttime")
+  #println("H5SampleInterval: $H5SampleInterval")
+  #println("H5SingleIonSignal: $H5SingleIonSignal")
+  return (H5SampleInterval./H5SingleIonSignal./H5inttime)[1] #orig
+  #return (1.0/H5inttime)/H5SingleIonSignal
 end
 
 function getSubSpectrumTimeFromFile(filename, index)
