@@ -293,10 +293,9 @@ function correctMassScaleAndExtractSumSpec(
         end
         ################## Peak Integration ################################
         #@sync @parallel
-        #Threads.@threads
         mbIndicesLowMass = TOFFunctions.mass2timebin(massborders.lowMass,referenceMassScaleMode,newParams)
         mbIndicesHighMass = TOFFunctions.mass2timebin(massborders.highMass,referenceMassScaleMode,newParams)
-        for i=(1:nMasses)
+        Threads.@threads for i=(1:nMasses)
           if (mod(i,100) == 0)
             #println("Processing mass $(masslistMasses[i])")
           end

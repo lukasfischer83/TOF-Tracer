@@ -4,7 +4,7 @@ import HDF5
 import InterpolationFunctions
 import PyPlot
 
-SPEC_CACHE_SIZE_LIMIT = 1e9
+SPEC_CACHE_SIZE_LIMIT = 5e8
 
 #using PyCall
 #@pyimport h5py
@@ -38,7 +38,7 @@ function mass2timebin(mass::Number,mode,parameters)
 end
 function mass2timebin(mass::AbstractArray,mode,parameters)
   ret = Array{Float64}(length(mass))
-  for i = 1:length(mass)
+  Threads.@threads for i = 1:length(mass)
     ret[i] = TOFFunctions.mass2timebin(mass[i],mode,parameters)
   end
   return ret
@@ -58,7 +58,7 @@ end
 
 function timebin2mass(time::AbstractArray,mode,parameters)
   ret = Array{Float64}(length(time))
-  for i = 1:length(time)
+  Threads.@threads for i = 1:length(time)
     ret[i] = timebin2mass(time[i],mode,parameters)
   end
   return ret
