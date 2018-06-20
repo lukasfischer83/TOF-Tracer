@@ -19,7 +19,7 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
     return peakIndices
   end
 
-  function calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices; nbrMassRegions = 10, peakWindowWidth = 200, quantileValue = 0.05)
+  function calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices; nbrMassRegions = 10, peakWindowWidth = peakWindowWidth, quantileValue = 0.05)
     peakMasses = InterpolationFunctions.interpolate(peakIndices, massAxis)
     peakValues = InterpolationFunctions.interpolate(peakIndices,baselineCorrectedAvgSpec)
 
