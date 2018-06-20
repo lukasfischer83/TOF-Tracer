@@ -14,6 +14,11 @@ s = (masslistMasses.>17) & ( masslistMasses.<1200)
 masslistMasses = masslistMasses[s]
 masslistCompositions = masslistCompositions[s,:]
 
+####################### INFO ##########################################################################
+###       if the lower mass range of IONICON ioniTOF is set to values <25, the parameter:           ###
+###           safetyMarginMasses = 10  (can be found in MultipeakFunctions)                         ###
+###       should be set to smaller values, e.g. 3 or 4 in case of an "BoundsError".                 ###
+
 ####################### END OF SETTINGS ###############################################################
 
 ####################### Processing sequence ###########################################################
@@ -27,12 +32,13 @@ correctMassScaleAndExtractSumSpec(
     rf,
     cr,
     filefilterRegexp=filefilterRegexp,
-    onlyUseAverages = true,
+    onlyUseAverages = true, # at the moment, only "true" is possible.
     plotControlMass = true,
     firstNFiles=0,
     lastNFiles = 0,
-    testRangeStart = 52.0, # the mass shift of this region will be shown if plot control mass is set true. Should not be part of calibRegions
-    testRangeEnd = 56.5,
+    testRangeStart = 31.5, # the mass shift of this region will be shown if plot control mass is set true. Should not be part of calibRegions
+    testRangeEnd = 32.5,
+    binWidth = 20
     )
 
 baselineAndPeakshape(                   # recommended values for:
