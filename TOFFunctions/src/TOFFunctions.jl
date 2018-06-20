@@ -65,6 +65,32 @@ function timebin2mass(time::AbstractArray,mode,parameters)
 end
 
 function getMassCalibParametersFromFile(filename)
+  fh = HDF5.h5open(filename,"r")
+  if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+    setData  = fh["/PROCESSED/MassCalibration/SettingsData"]
+    if length(setData[1,:])==2
+      mcm = 0
+    elseif length(setData[1,:])==3
+      mcm = 2
+    else
+      println("Error in TOFFunctions: MassCalParam is higher than 3. Use only 3 MassCalParams or extend script.")
+    end
+    massCalibMode = 0 # mcm[1] # TODO: as soon as higher order mass cal functions are implemented in PTR-MS Viewer the zero can be replaced
+    massCalibParameters = []
+
+    try obj = fh["PROCESSED"]
+      println("##############  Use PROCESSED data  ###############")
+      pV = fh["/PROCESSED/MassCalibration/ParametersData"]
+      p1 = median(pV[1,:]) # TODO: exchange median as soon as a better way of handling is found
+      p2 = median(pV[2,:])
+    catch
+      println("########## No PROCESSED data available. Use unprocessed data instead. ##########")
+      pV = fh["/CALdata/Spectrum"]
+      p1 = pV[1,1]
+      p2 = pV[2,1]
+    end
+    massCalibParameters = [p1[1] p2[1]]
+  else
     attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
     mcm = attributesFullSpectra["MassCalibMode"]
@@ -83,41 +109,75 @@ function getMassCalibParametersFromFile(filename)
       p3 = attributesFullSpectra["MassCalibration p3"]
       massCalibParameters = [p1[1] p2[1] p3[1]]
     end
-
-    return massCalibMode, massCalibParameters
+  end
+  HDF5.close(fh)
+  return massCalibMode, massCalibParameters
 end
 function getAvgSpectrumFromFile(filename)
   #println("Getting avg spectrum from $filename")
+  fh = HDF5.h5open(filename,"r")
+  if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+    #fh = HDF5.h5open(filename,"r")
+    attributesRoot = HDF5.h5readattr(filename, "/")
 
-  attributesRoot = HDF5.h5readattr(filename, "/")
-  attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
+    H5TofPeriod = attributesRoot["Pulsing Period (ns)"].*1e-9
+    H5NbrWaveForms = round(1/(H5TofPeriod[1]))
+    H5SampleInterval = attributesRoot["Timebin width (ps)"] .* 1e-12 .* 1e9
+    ds = fh["/TRACEdata/TraceRaw"]
+    H5NbrWrites = size(ds)[2]
+    H5NbrBufs = attributesRoot["Single Spec Duration (ms)"] #./ 1000
+    H5NbrSegments = 1
+    H5NbrBlocks = 1
+    H5SingleIonSignal = 1 # how high is it really ?
 
-  H5NbrWrites = attributesRoot["NbrWrites"]
-  H5NbrBufs = attributesRoot["NbrBufs"]
-  H5NbrWaveForms = attributesRoot["NbrWaveforms"]
-  H5TofPeriod = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"]
-  H5NbrSegments = attributesRoot["NbrSegments"]
-  H5NbrBlocks = attributesRoot["NbrBlocks"]
+    H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks.*H5NbrBufs.*H5NbrWrites .* 1e-9
+    try obj = fh["PROCESSED"]
+        avgSpectrum = HDF5.h5read(filename, "PROCESSED/AverageSpectrum/AverageSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
+    catch
+        avgSpectrum = HDF5.h5read(filename, "SPECdata/AverageSpec").*H5SampleInterval./H5SingleIonSignal./H5inttime
+    end
 
-  H5SampleInterval = attributesFullSpectra["SampleInterval"] .* 1e9
-  H5SingleIonSignal = attributesFullSpectra["Single Ion Signal"]
+    return avgSpectrum
+  else
+    attributesRoot = HDF5.h5readattr(filename, "/")
+    attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
-  H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks.*H5NbrBufs.*H5NbrWrites .* 1e-9
+    H5NbrWrites = attributesRoot["NbrWrites"]
+    H5NbrBufs = attributesRoot["NbrBufs"]
+    H5NbrWaveForms = attributesRoot["NbrWaveforms"]
+    H5TofPeriod = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"]
+    H5NbrSegments = attributesRoot["NbrSegments"]
+    H5NbrBlocks = attributesRoot["NbrBlocks"]
 
-  avgSpectrum = HDF5.h5read(filename, "FullSpectra/SumSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
-  #println("Avg Spec Multiplier = $(H5SampleInterval./H5SingleIonSignal./H5inttime)")
-  return avgSpectrum
+    H5SampleInterval = attributesFullSpectra["SampleInterval"] .* 1e9
+    H5SingleIonSignal = attributesFullSpectra["Single Ion Signal"]
+
+    H5inttime = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks.*H5NbrBufs.*H5NbrWrites .* 1e-9
+
+    avgSpectrum = HDF5.h5read(filename, "FullSpectra/SumSpectrum").*H5SampleInterval./H5SingleIonSignal./H5inttime
+    #println("Avg Spec Multiplier = $(H5SampleInterval./H5SingleIonSignal./H5inttime)")
+    return avgSpectrum
+  end
+  HDF5.close(fh)
 end
 
 function getSubSpectraCount(filename)
   #println("Getting sub spectrum count from $filename")
-
   fh = HDF5.h5open(filename,"r")
-  ds = fh["/FullSpectra/TofData"]
-  l=size(ds)[3]
-  m=size(ds)[4]
-  HDF5.close(fh)
-  return l*m
+  if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+      ds = fh["/SPECdata/Intensities"]
+      l=size(ds)[1]
+      m=size(ds)[2]
+      HDF5.close(fh)
+      return l*m
+  else
+    fh = HDF5.h5open(filename,"r")
+    ds = fh["/FullSpectra/TofData"]
+    l=size(ds)[3]
+    m=size(ds)[4]
+    HDF5.close(fh)
+    return l*m
+  end
 end
 
 function loadWholeTofData(filename)
@@ -173,36 +233,68 @@ function getSubSpectrumFromFile(filename, index; preloadFile = "")
 end
 
 function getSpecMultiplicator(filename)
-  attributesRoot = HDF5.h5readattr(filename, "/")
-  attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
+  fh = HDF5.h5open(filename,"r")
+  if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+    attributesRoot = HDF5.h5readattr(filename, "/")
 
-  #H5NbrWrites::Float32 = attributesRoot["NbrWrites"]
-  #H5NbrBufs::Float32 = attributesRoot["NbrBufs"]
-  H5NbrWaveForms::Float32 = attributesRoot["NbrWaveforms"][1]
-  H5TofPeriod::Float32 = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"][1]
-  H5NbrSegments::Float32 = attributesRoot["NbrSegments"][1]
-  H5NbrBlocks::Float32 = attributesRoot["NbrBlocks"][1]
+    H5TofPeriod = attributesRoot["Pulsing Period (ns)"][1]
+    H5NbrWaveForms = 1/(H5TofPeriod[1].*1e-9)
+    H5SampleInterval = attributesRoot["Timebin width (ps)"][1] .* 1e-12 .* 1e9
+    ds = fh["/TRACEdata/TraceRaw"]
+    H5NbrWrites = size(ds)[2]
+    H5NbrSegments = 1
+    H5NbrBlocks = 1
+    H5SingleIonSignal = 1
 
-  H5SampleInterval::Float32 = attributesFullSpectra["SampleInterval"][1] .* 1.0e9
-  H5SingleIonSignal::Float32 = attributesFullSpectra["Single Ion Signal"][1]
+    H5inttime = H5NbrWaveForms.*H5TofPeriod[1].*H5NbrSegments.*H5NbrBlocks .* 1e-9
+    return (H5SampleInterval./H5SingleIonSignal./H5inttime)[1]
+  else
+    attributesRoot = HDF5.h5readattr(filename, "/")
+    attributesFullSpectra = HDF5.h5readattr(filename, "/FullSpectra")
 
-  #H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks .* 1.0e-9
-  H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.* 1.0e-9 # laut Tanner keine Segments und Blocks
-  #println("H5inttime: $H5inttime")
-  #println("H5SampleInterval: $H5SampleInterval")
-  #println("H5SingleIonSignal: $H5SingleIonSignal")
-  return (H5SampleInterval./H5SingleIonSignal./H5inttime)[1] #orig
-  #return (1.0/H5inttime)/H5SingleIonSignal
+    #H5NbrWrites::Float32 = attributesRoot["NbrWrites"]
+    #H5NbrBufs::Float32 = attributesRoot["NbrBufs"]
+    H5NbrWaveForms::Float32 = attributesRoot["NbrWaveforms"][1]
+    H5TofPeriod::Float32 = HDF5.h5readattr(filename, "/TimingData")["TofPeriod"][1]
+    H5NbrSegments::Float32 = attributesRoot["NbrSegments"][1]
+    H5NbrBlocks::Float32 = attributesRoot["NbrBlocks"][1]
+
+    H5SampleInterval::Float32 = attributesFullSpectra["SampleInterval"][1] .* 1.0e9
+    H5SingleIonSignal::Float32 = attributesFullSpectra["Single Ion Signal"][1]
+
+    #H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.*H5NbrSegments.*H5NbrBlocks .* 1.0e-9
+    H5inttime::Float32 = H5NbrWaveForms.*H5TofPeriod.* 1.0e-9 # laut Tanner keine Segments und Blocks
+    #println("H5inttime: $H5inttime")
+    #println("H5SampleInterval: $H5SampleInterval")
+    #println("H5SingleIonSignal: $H5SingleIonSignal")
+    return (H5SampleInterval./H5SingleIonSignal./H5inttime)[1] #orig
+    #return (1.0/H5inttime)/H5SingleIonSignal
+  end
+  HDF5.close(fh)
 end
 
 function getSubSpectrumTimeFromFile(filename, index)
     if filename != timeCache.filename
+      fh = HDF5.h5open(filename,"r")
+      if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+        SpectraTimes = HDF5.h5read(filename, "/SPECdata/Times")
+        if size(SpectraTimes[:,1])==4
+          n=3
+        else
+          n=2
+        end
+        allSpectraTimes = SpectraTimes[n,:]-SpectraTimes[n,1]
+        ds = fh["/SPECdata/Times"]
+        timeCache.filename = filename
+        timeCache.content = allSpectraTimes #ds[:,:]
+      else
         fh = HDF5.h5open(filename,"r")
         allSpectraTimes = HDF5.h5read(filename, "/TimingData/BufTimes")
         ds = fh["/TimingData/BufTimes"]
         timeCache.filename = filename
         timeCache.content = ds[:,:]
-        HDF5.close(fh)
+      end
+      HDF5.close(fh)
     end
     (l,m) = ind2sub((size(timeCache.content)[1],size(timeCache.content)[2]), index)
     #println("Getting sub spectrum Time ($l,$m) from $filename")
@@ -214,22 +306,38 @@ end
 function getTimeFromFile(filename)
 
   # TODO: Replace with Aquisition log Start Time (Windows Timestamp)
-    time_windowsTimestamp = HDF5.h5read(filename, "/AcquisitionLog/Log")[1].data[1]
-    tUnix = time_windowsTimestamp/(10.0*1000.0*1000.0)-11644473600.0
-    println("tUnix has size $(size(tUnix))")
-    t = Dates.unix2datetime(tUnix)#[1]
-    #=
-    attributesRoot = HDF5.h5readattr(filename, "/")
-    time_s = attributesRoot["HDF5 File Creation Time"]
-    acq_card = attributesRoot["DAQ Hardware"]
-    #println(acq_card)
-    if (acq_card == "Cronologic HPTDC8-PCI")
-      t = DateTime(time_s, "m/d/y H:M:S") # STOF
+    fh = HDF5.h5open(filename,"r")
+    if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+      attributesRoot = HDF5.h5readattr(filename, "/")
+      if HDF5.exists(HDF5.attrs(fh), "FileCreatedTime_UTC")
+          time_LabVIEWTimestamp = attributesRoot["FileCreatedTime_UTC"]
+          println("### Using UTC time stamp ###")
+      else
+          time_LabVIEWTimestamp = attributesRoot["FileCreatedTime"]
+          println("### Using local time stamp ###")
+      end
+      tUnix = time_LabVIEWTimestamp-(1970-1904)*365*24*3600
+      println("tUnix has size $(size(tUnix))")
+      t = Dates.unix2datetime(tUnix[1])
     else
-      t = DateTime(time_s, "d/m/y H:M:S") # PTR3
+      time_windowsTimestamp = HDF5.h5read(filename, "/AcquisitionLog/Log")[1].data[1]
+      tUnix = time_windowsTimestamp/(10.0*1000.0*1000.0)-11644473600.0
+      println("tUnix has size $(size(tUnix))")
+      t = Dates.unix2datetime(tUnix)#[1]
+      #=
+      attributesRoot = HDF5.h5readattr(filename, "/")
+      time_s = attributesRoot["HDF5 File Creation Time"]
+      acq_card = attributesRoot["DAQ Hardware"]
+      #println(acq_card)
+      if (acq_card == "Cronologic HPTDC8-PCI")
+        t = DateTime(time_s, "m/d/y H:M:S") # STOF
+      else
+        t = DateTime(time_s, "d/m/y H:M:S") # PTR3
+      end
+      =#
     end
-=#
-  return t
+    return t
+    HDF5.close(fh)
 end
 
 function validateHDF5Files(filepath, files)
@@ -247,11 +355,29 @@ function validateHDF5Files(filepath, files)
           push!(badFiles,files[j])
         else
           fh = HDF5.h5open(totalPath,"r")
-          ds = fh["TimingData/BufTimes"]
+          if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+              SpectraTimes = HDF5.h5read(totalPath, "/SPECdata/Times")
+              if size(SpectraTimes[:,1])[1]==4
+                  n=3
+              else
+                  n=2
+              end
+              allSpectraTimes = SpectraTimes[n,:]-SpectraTimes[n,1]
+              ds = allSpectraTimes
+          else
+            ds = fh["TimingData/BufTimes"]
+          end
           if (length(ds) > 0)
-            if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
-              if debuglevel > 1 println("OK") end
-              push!(validFiles,files[j])
+            if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+                if (ds[end,][end,] > 1e-99) #(ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files TODO
+                    if debuglevel > 1 println("OK ioniAPiTOF file") end
+                    push!(validFiles,files[j])
+                end
+            else
+              if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
+                if debuglevel > 1 println("OK") end
+                push!(validFiles,files[j])
+              end
             end
           else
             if debuglevel > 0   println("Bad File: $totalPath") end

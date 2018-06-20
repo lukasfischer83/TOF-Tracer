@@ -2,6 +2,8 @@ push!(LOAD_PATH, pwd())
 
 
 import HDF5
+using PyCall
+pygui(:tk) # :tk, :gtk3, :gtk, :qt5, :qt4, :qt, or :wx
 import PyPlot
 import TOFFunctions
 import InterpolationFunctions
@@ -81,8 +83,18 @@ function correctMassScaleAndExtractSumSpec(
   referenceMassScaleMode, referenceMassScaleParameters = TOFFunctions.getMassCalibParametersFromFile(referenceFile)
   TOFFunctions.setMassScaleReferenceSpectrum(referenceSpectrum, calibRegions, searchWidth, referenceMassScaleMode, referenceMassScaleParameters, plotControlMass=plotControlMass, testRangeStart=testRangeStart, testRangeEnd=testRangeEnd)
   referenceMassAxis = []
-  referenceMassAxis = HDF5.h5read(referenceFile, "FullSpectra/MassAxis")
-
+  fh = HDF5.h5open(referenceFile,"r")
+  if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+    lenMassAxis = length(HDF5.h5read(referenceFile, "SPECdata/AverageSpec"))
+    timeBins = vcat(linspace(1,lenMassAxis,lenMassAxis))
+    pV = HDF5.h5read(referenceFile,"/CALdata/Spectrum")
+    p1 = pV[1,1]
+    p2 = pV[2,1]
+    referenceMassAxis = ((timeBins[:]-p2[1])/p1[1]).^2
+  else
+    referenceMassAxis = HDF5.h5read(referenceFile, "FullSpectra/MassAxis")
+  end
+  HDF5.close(fh)
   # Tofwerk does not update the mass axis after manual recalibration in TofDAQ Viewer.
   # ==> recalculate based on calib parameters.
   println("Recalculating mass axis")
@@ -188,7 +200,24 @@ function correctMassScaleAndExtractSumSpec(
 
     fileIsBad = false;
     massAxis = []
-    massAxis = HDF5.h5read(totalPath, "FullSpectra/MassAxis")
+    fh = HDF5.h5open(totalPath,"r")
+    #println("fh= ",fh)
+    if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
+      try obj = fh["PROCESSED"]
+          massAxis = HDF5.h5read(filename, "PROCESSED/AverageSpectrum/MassAxis")
+      catch
+          lenMassAxis = length(HDF5.h5read(totalPath, "SPECdata/AverageSpec"))
+          timeBins = vcat(linspace(1,lenMassAxis,lenMassAxis))
+          pV = HDF5.h5read(totalPath,"/CALdata/Spectrum")
+          p1 = pV[1,1]
+          p2 = pV[2,1]
+          massAxis = ((timeBins[:]-p2[1])/p1[1]).^2
+      end
+    else
+      massAxis = HDF5.h5read(totalPath, "FullSpectra/MassAxis")
+    end
+    HDF5.close(fh)
+
     time[j] = TOFFunctions.getTimeFromFile(totalPath)
 
     avgSpectrum = TOFFunctions.getAvgSpectrumFromFile(totalPath)
