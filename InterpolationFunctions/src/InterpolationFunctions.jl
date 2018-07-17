@@ -12,14 +12,35 @@ return max
 end
 
 function interpolate(x::AbstractFloat, xAxis, yAxis)
-  if x <= xAxis[1]
-    return yAxis[1]
-  elseif x >= xAxis[end]
-    return yAxis[end]
-  end
-  indexLow = searchsortedfirst(xAxis,x) - 1
-  fraction = (x - xAxis[indexLow]) / (xAxis[indexLow+1] - xAxis[indexLow])
-  return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
+    try
+      if x <= xAxis[1]
+        return yAxis[1]
+      elseif x >= xAxis[end]
+        return yAxis[end]
+      end
+      indexLow = searchsortedfirst(xAxis,x) - 1
+      fraction = (x - xAxis[indexLow]) / (xAxis[indexLow+1] - xAxis[indexLow])
+      return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
+    catch
+        println("Interpolation Error")
+    end
+end
+
+function interpolate(x::DateTime, xAxis, yAxis)
+    x=Dates.datetime2unix(x)
+    xAxis = Dates.datetime2unix.(xAxis)
+    try
+      if x <= xAxis[1]
+        return yAxis[1]
+      elseif x >= xAxis[end]
+        return yAxis[end]
+      end
+      indexLow = searchsortedfirst(xAxis,x) - 1
+      fraction = (x - xAxis[indexLow]) / (xAxis[indexLow+1] - xAxis[indexLow])
+      return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
+    catch
+        println("Interpolation Error")
+    end
 end
 
 function interpolate(x::AbstractFloat, yAxis)
@@ -33,12 +54,12 @@ function interpolate(x::AbstractFloat, yAxis)
       fraction = (x - indexLow)
       return fraction * yAxis[indexLow+1] + (1-fraction) * yAxis[indexLow]
   catch
-      println("Interpolation Error: x=$x, floor(x)= $(floor(x))")
+      println("Interpolation Error")
   end
 end
 
 function interpolate(x::AbstractArray, xAxis, yAxis)
-  y = Array{Float64}(length(x))
+  y = Array{typeof(yAxis[1])}(length(x))
   Threads.@threads for i = 1 : length(x)
     y[i] = InterpolationFunctions.interpolate(x[i],xAxis,yAxis)
   end
@@ -46,7 +67,7 @@ function interpolate(x::AbstractArray, xAxis, yAxis)
 end
 
 function interpolate(x::AbstractArray, yAxis)
-  y = Array{Float64}(length(x))
+  y = Array{typeof(yAxis[1])}(length(x))
   Threads.@threads for i = 1 : length(x)
     y[i] = InterpolationFunctions.interpolate(x[i],yAxis)
   end
