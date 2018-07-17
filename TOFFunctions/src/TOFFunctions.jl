@@ -344,6 +344,7 @@ function validateHDF5Files(filepath, files)
   if debuglevel > 0   println("$nFiles files found, checking if valid.") end
   validFiles = []
   badFiles = []
+  startTimes = []
   nFiles = size(files,1)
 
   for j=1:nFiles
@@ -372,11 +373,13 @@ function validateHDF5Files(filepath, files)
                 if (ds[end,][end,] > 1e-99) #(ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files TODO
                     if debuglevel > 1 println("OK ioniAPiTOF file") end
                     push!(validFiles,files[j])
+                    push!(startTimes,ds[1,][1,])
                 end
             else
               if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
                 if debuglevel > 1 println("OK") end
                 push!(validFiles,files[j])
+                push!(startTimes,ds[1,1][1,1])
               end
             end
           else
@@ -390,7 +393,7 @@ function validateHDF5Files(filepath, files)
     end
   end
   if debuglevel > 0   println("$(length(files)-length(validFiles)) files removed.") end
-  return validFiles
+  return validFiles, sortperm(startTimes)
 end
 
 

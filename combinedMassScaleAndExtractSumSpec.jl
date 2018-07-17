@@ -65,9 +65,9 @@ function correctMassScaleAndExtractSumSpec(
 
   nFiles = size(files,1)
 
-  validFiles = TOFFunctions.validateHDF5Files(filepath, files)
+  validFiles, timeSortIndices = TOFFunctions.validateHDF5Files(filepath, files)
 
-  files = validFiles
+  files = validFiles[timeSortIndices]
   nFiles = size(files,1)
 
 

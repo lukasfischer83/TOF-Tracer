@@ -47,7 +47,7 @@ end
 function fromMatlabTime(timestamp::Number)
     days=Int(floor(timestamp))
     millisecondsRemainder = Int(round((timestamp-days)*24*3600*1000))
-    return DateTime(0,1,1,0,0,0)+Dates.Day(days-1)+Dates.Millisecond(millisecondsRemainder)
+    return DateTime(0,1,1,0,0,0)+Dates.Day(days-1)+Dates.Millisecond(millisecondsRemainder)+Dates.Year(1)
 end
 
 end
