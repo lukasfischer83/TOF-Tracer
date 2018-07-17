@@ -373,13 +373,13 @@ function validateHDF5Files(filepath, files)
                 if (ds[end,][end,] > 1e-99) #(ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files TODO
                     if debuglevel > 1 println("OK ioniAPiTOF file") end
                     push!(validFiles,files[j])
-                    push!(startTimes,ds[1,][1,])
+                    push!(startTimes,getTimeFromFile(files[j]))
                 end
             else
               if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
                 if debuglevel > 1 println("OK") end
                 push!(validFiles,files[j])
-                push!(startTimes,ds[1,1][1,1])
+                push!(startTimes,getTimeFromFile(files[j]))
               end
             end
           else

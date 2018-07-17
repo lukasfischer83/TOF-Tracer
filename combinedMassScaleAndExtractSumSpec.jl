@@ -66,7 +66,11 @@ function correctMassScaleAndExtractSumSpec(
   nFiles = size(files,1)
 
   validFiles, timeSortIndices = TOFFunctions.validateHDF5Files(filepath, files)
-
+  if !issorted(timeSortIndices)
+      println("Reordering Files according to start acquisition time!")
+  else
+      println("File order seems fine, continuing...")
+  end
   files = validFiles[timeSortIndices]
   nFiles = size(files,1)
 
