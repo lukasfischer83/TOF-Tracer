@@ -2,7 +2,7 @@ push!(LOAD_PATH, pwd())
 
 using HDF5
 using PyCall
-pygui(:wx) # :tk, :gtk3, :gtk, :qt5, :qt4, :qt, or :wx
+pygui(:tk) # :tk, :gtk3, :gtk, :qt5, :qt4, :qt, or :wx
 using PyPlot
 import InterpolationFunctions
 import  MasslistFunctions
@@ -30,7 +30,7 @@ file = "ExampleFiles/TOFDATA/results/_result.hdf5"
 
 plotHighTimeRes = true
 plotFittedInsteadOfSummed = true # Use multi peak fitted data instead of raw
-smoothing = 1
+smoothing = 1 #Average
 reconstruct = false
 plotsymbol = "-"
 isobarToPlot = 0
@@ -217,7 +217,7 @@ end
 
 bgCorrectedTraces = measResult.Traces.-background
 
-semilogy(Dates.unix2datetime(InterpolationFunctions.averageSamples(Dates.datetime2unix(measResult.Times), smoothing)),1/(5600*0.77)*InterpolationFunctions.averageSamples(bgCorrectedTraces,smoothing), plotsymbol) #linewidth=1)
+semilogy(Dates.unix2datetime(InterpolationFunctions.averageSamples(Dates.datetime2unix(measResult.Times), smoothing)),InterpolationFunctions.averageSamples(bgCorrectedTraces,smoothing), plotsymbol) #linewidth=1)
 #semilogy(Dates.unix2datetime(InterpolationFunctions.averageSamples(Dates.datetime2unix(measResult.Times), smoothing)),InterpolationFunctions.averageSamples(bgCorrectedTraces,smoothing), plotsymbol) #linewidth=1)
 
 startTimeString = Dates.format(measResult.Times[1],"yyyy/mm/dd")
