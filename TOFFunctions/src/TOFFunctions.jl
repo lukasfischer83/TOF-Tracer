@@ -305,7 +305,6 @@ end
 
 function getTimeFromFile(filename)
 
-  # TODO: Replace with Aquisition log Start Time (Windows Timestamp)
     fh = HDF5.h5open(filename,"r")
     if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
       attributesRoot = HDF5.h5readattr(filename, "/")
@@ -319,7 +318,9 @@ function getTimeFromFile(filename)
       tUnix = time_LabVIEWTimestamp-(1970-1904)*365*24*3600
       println("tUnix has size $(size(tUnix))")
       t = Dates.unix2datetime(tUnix[1])
+      HDF5.close(fh)
     else
+      HDF5.close(fh)
       time_windowsTimestamp = HDF5.h5read(filename, "/AcquisitionLog/Log")[1].data[1]
       tUnix = time_windowsTimestamp/(10.0*1000.0*1000.0)-11644473600.0
       println("tUnix has size $(size(tUnix))")
@@ -337,11 +338,10 @@ function getTimeFromFile(filename)
       =#
     end
     return t
-    HDF5.close(fh)
 end
 
 function validateHDF5Files(filepath, files)
-  if debuglevel > 0   println("$nFiles files found, checking if valid.") end
+  if debuglevel > 0   println("$(length(files)) files found, checking if valid.") end
   validFiles = []
   badFiles = []
   startTimes = []
@@ -356,6 +356,9 @@ function validateHDF5Files(filepath, files)
           push!(badFiles,files[j])
         else
           fh = HDF5.h5open(totalPath,"r")
+
+
+
           if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
               SpectraTimes = HDF5.h5read(totalPath, "/SPECdata/Times")
               if size(SpectraTimes[:,1])[1]==4
@@ -368,31 +371,40 @@ function validateHDF5Files(filepath, files)
           else
             ds = fh["TimingData/BufTimes"]
           end
+
+
+
           if (length(ds) > 0)
             if HDF5.exists(HDF5.attrs(fh), "InstrumentType")
                 if (ds[end,][end,] > 1e-99) #(ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files TODO
                     if debuglevel > 1 println("OK ioniAPiTOF file") end
                     push!(validFiles,files[j])
-                    push!(startTimes,getTimeFromFile(files[j]))
+                    HDF5.close(fh)
+                    push!(startTimes,getTimeFromFile(totalPath))
                 end
             else
               if (ds[end,end][end,end] > 1e-99) # Last timestamp seems to be very small on corrupted files
                 if debuglevel > 1 println("OK") end
                 push!(validFiles,files[j])
-                push!(startTimes,getTimeFromFile(files[j]))
+                HDF5.close(fh)
+                push!(startTimes, getTimeFromFile(totalPath))
               end
             end
           else
+
+
+
             if debuglevel > 0   println("Bad File: $totalPath") end
             push!(badFiles,files[j])
           end
-          HDF5.close(fh)
+          #HDF5.close(fh)
         end
     catch
         println("File seems corrupt: $(files[j])")
     end
   end
   if debuglevel > 0   println("$(length(files)-length(validFiles)) files removed.") end
+  println("Finished validation of HDF5 Files.")
   return validFiles, sortperm(startTimes)
 end
 
