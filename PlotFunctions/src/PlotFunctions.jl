@@ -3,7 +3,7 @@ module PlotFunctions
 import  MasslistFunctions
 using PyPlot
 
-export massDefectPlot
+export massDefectPlot, bananaPlot
 
 function massDefectPlot(masses, compositions, concentrations, colors, plotTitle, colorCodeTitle; dotSize = 10, maxMass = 450, maxDefect = 0.25, minConc = 0.02, sumformulas = false)
   figure()
@@ -35,6 +35,16 @@ function massDefectPlot(masses, compositions, concentrations, colors, plotTitle,
   ylabel("Kendrick Mass Defect")
   title(plotTitle)
   grid("on")
+end
+
+function bananaPlot(xbins,ybins,meshdataXY;subplotAx=0)
+    println("Not implemented yet!!!")
+    #if subplotAx == 0
+    #    figure()
+    #    subplotAx = subplot(1,1,1)
+    #end
+    pcolormesh([DateTime(2018,05,05),DateTime(2018,05,06),DateTime(2018,05,07)],[1,7,9],[1 2 3; 4 5 6; 7 8 9][1:end-1,1:end-1])
+    #yscale("log")
 end
 
 end
