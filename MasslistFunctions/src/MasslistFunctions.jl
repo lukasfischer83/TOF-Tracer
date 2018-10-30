@@ -1,5 +1,6 @@
 __precompile__()
 module MasslistFunctions
+using HDF5
 
 export IntegrationBorders, masslistPos, createMassList, loadMasslist, createCompound, massFromComposition, massFromCompositionArray, massFromCompositionArrayList, isotopesFromComposition, isotopesFromCompositionArray, sumFormulaStringFromCompositionArray, sumFormulaStringListFromCompositionArrayList, filterMassListByContribution1, filterMassListByContribution2, findClosestMassIndex, inCompositions, findInCompositions
 
@@ -103,25 +104,38 @@ function createMassList(; C=0:0, O=0:0, N=0:0, S=0:0, nHplus=1, allowRadicals=fa
 end
 
 function loadMasslist(filename)
-  list = readdlm(filename, '\t', skipstart=7)
-  masses = Array{Float64}(0)
-  masslistCompositions = []
-  print("Unidentified Peaks found in masslist $filename: ")
-  for i=1:size(list,1)
-    if sum(list[i,1:8]) > 0
-      push!(masses,massFromCompositionArray(list[i,1:8]))
-      push!(masslistCompositions, list[i,1:8])
-    else
-        if list[i,9] > 0
-        print("$(list[i,9]) ")
-        push!(masses,list[i,9])
-        push!(masslistCompositions, list[i,1:8])
+    fileIsValidResultfile = (endswith(filename, ".hdf5") || endswith(filename, ".h5"))
+    if fileIsValidResultfile
+        println("Trying to load masslist from result hdf5 file ($filename)!")
+        masses =  HDF5.h5read(filename, "MassList")
+        masslistElementsLoaded = HDF5.h5read(filename,"ElementNames")
+        compRaw = HDF5.h5read(filename, "ElementalCompositions")
+        masslistCompositions = []
+        for i=1:size(compRaw,2)
+            push!(masslistCompositions,compRaw[:,i])
         end
-    end
-
+        return masses,masslistElementsLoaded, masslistElementMasses, masslistCompositions
+    else
+      println("Trying to load masslist from csv file ($filename)!")
+      list = readdlm(filename, '\t', skipstart=7)
+      masses = Array{Float64}(0)
+      masslistCompositions = []
+      print("Unidentified Peaks found in masslist $filename: ")
+      for i=1:size(list,1)
+        if sum(list[i,1:8]) > 0
+          push!(masses,massFromCompositionArray(list[i,1:8]))
+          push!(masslistCompositions, list[i,1:8])
+        else
+            if list[i,9] > 0
+            print("$(list[i,9]) ")
+            push!(masses,list[i,9])
+            push!(masslistCompositions, list[i,1:8])
+            end
+        end
+      end
+      sortIndices = sortperm(masses)
+      return masses[sortIndices],masslistElements, masslistElementMasses, masslistCompositions[sortIndices]
   end
-  sortIndices = sortperm(masses)
-  return masses[sortIndices],masslistElements, masslistElementMasses, masslistCompositions[sortIndices]
 end
 
 function createCompound(; C=0, C13=0, H=0, Hplus=1, N=0, O=0, O18=0, S=0)

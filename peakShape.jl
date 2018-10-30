@@ -10,9 +10,11 @@ function baselineAndPeakshape(
   filepath;
   outputfilename="results/_result.hdf5",
   peakshapeRegions=8,
+  peakshapeRegionStretch=0.5,
   peakshapeQuantileValue = 0.1,
   peakfindingNoiseThresholdValue = 25,
-  peakWindowWidth = 200
+  peakWindowWidth = 200,
+  peakfindingSignalLimit = 0.2
   )
 
   file = joinpath(filepath, outputfilename)
@@ -25,8 +27,8 @@ function baselineAndPeakshape(
   baselineCorrectedAvgSpec = avgSpectrum[:,1] - baselineInterpolated;
 
 
-  peakIndices = PeakshapeFunctions.findPeakIndices(massAxis, avgSpectrum, baselineInterpolated, baselineNoiseInterpolated, noiseThreshold = peakfindingNoiseThresholdValue)
-  peakShapesCenterMass, peakShapesY = PeakshapeFunctions.calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices, nbrMassRegions = peakshapeRegions, peakWindowWidth = peakWindowWidth, quantileValue = peakshapeQuantileValue)
+  peakIndices = PeakshapeFunctions.findPeakIndices(massAxis, avgSpectrum, baselineInterpolated, baselineNoiseInterpolated, noiseThreshold = peakfindingNoiseThresholdValue, signalLimit = peakfindingSignalLimit)
+  peakShapesCenterMass, peakShapesY = PeakshapeFunctions.calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices, nbrMassRegions = peakshapeRegions,regionStretch=peakshapeRegionStretch, peakWindowWidth = peakWindowWidth, quantileValue = peakshapeQuantileValue)
 
   PyPlot.figure()
   PyPlot.title("Baseline Correction")

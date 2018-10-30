@@ -5,11 +5,11 @@ import PyPlot
 
 export findPeakIndices, calculatePeakshapes, getLocalPeakshape
 "searches an average spectrum for peaks signifficantly higher than the baseline noise and returns their interpolated indices in the average spectrum"
-  function findPeakIndices(massAxis, avgSpectrum, baseline, baselineNoise; noiseThreshold = 80, oddEven="both")
+  function findPeakIndices(massAxis, avgSpectrum, baseline, baselineNoise; noiseThreshold = 80, oddEven="both", signalLimit = 1)
     totalMax = maximum(avgSpectrum)
     peakIndices = Array{Float64}(1)
     for j=searchsortedfirst(massAxis,10):length(massAxis)-1
-      if ( avgSpectrum[j] > baseline[j] + baselineNoise[j] * noiseThreshold * 400/(massAxis[j]^0.6)) && (avgSpectrum[j] > avgSpectrum[j-1]) && (avgSpectrum[j] > avgSpectrum[j+1]) && (avgSpectrum[j] < totalMax*0.1)
+      if ( avgSpectrum[j] > baseline[j] + baselineNoise[j] * noiseThreshold * 400/(massAxis[j]^0.6)) && (avgSpectrum[j] > avgSpectrum[j-1]) && (avgSpectrum[j] > avgSpectrum[j+1]) && (avgSpectrum[j] < totalMax*signalLimit)
           if (oddEven == "both") | ((oddEven == "even") & iseven(Int(round(massAxis[j],0)))) | ((oddEven == "odd") & !iseven(Int(round(massAxis[j],0))))
               ############ put interpolated exact peak position in peak list ###
               push!(peakIndices,InterpolationFunctions.interpolatedMax(j,avgSpectrum))
@@ -19,7 +19,7 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
     return peakIndices
   end
 
-  function calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices; nbrMassRegions = 10, peakWindowWidth = peakWindowWidth, quantileValue = 0.05)
+  function calculatePeakshapes(massAxis, baselineCorrectedAvgSpec, peakIndices; nbrMassRegions = 10, peakWindowWidth = peakWindowWidth, quantileValue = 0.05, regionStretch=1)
     peakMasses = InterpolationFunctions.interpolate(peakIndices, massAxis)
     peakValues = InterpolationFunctions.interpolate(peakIndices,baselineCorrectedAvgSpec)
 
@@ -32,8 +32,8 @@ export findPeakIndices, calculatePeakshapes, getLocalPeakshape
 
       #peakshapeRangeStart = (massRegion-1) *peakMasses[end] / nbrMassRegions
       #peakshapeRangeEnd = (massRegion) *peakMasses[end] / nbrMassRegions
-      peakshapeRangeStart = (massRegion-1)^2 *peakMasses[end] / nbrMassRegions^2
-      peakshapeRangeEnd = (massRegion)^2 *peakMasses[end] / nbrMassRegions^2
+      peakshapeRangeStart = (massRegion-1)^regionStretch *peakMasses[end] / nbrMassRegions^regionStretch
+      peakshapeRangeEnd = (massRegion)^regionStretch *peakMasses[end] / nbrMassRegions^regionStretch
 
       peakShapesCenterMass[massRegion] = (peakshapeRangeEnd + peakshapeRangeStart)/2
       sel = (peakMasses.>peakshapeRangeStart) & (peakMasses.<peakshapeRangeEnd) & (peakIndices.> peakWindowWidth) & (peakIndices .< length(baselineCorrectedAvgSpec)-peakWindowWidth)
